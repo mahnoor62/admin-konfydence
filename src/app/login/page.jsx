@@ -15,9 +15,9 @@ import {
 } from '@mui/material';
 import api from '@/lib/api';
 
-export default function AdminRegister() {
+export default function AdminLogin() {
   const router = useRouter();
-  const [formData, setFormData] = useState({ name: '', email: '', password: '', confirmPassword: '' });
+  const [formData, setFormData] = useState({ email: '', password: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -28,34 +28,18 @@ export default function AdminRegister() {
     }
   }, [router]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-
-    if (formData.password !== formData.confirmPassword) {
-      setError('Passwords do not match');
-      return;
-    }
-
-    if (formData.password.length < 6) {
-      setError('Password must be at least 6 characters');
-      return;
-    }
-
     setLoading(true);
 
     try {
-      const res = await api.post('/auth/register-admin', {
-        email: formData.email,
-        password: formData.password,
-        name: formData.name,
-      });
-      
+      const res = await api.post('/auth/login', formData);
       localStorage.setItem('admin_token', res.data.token);
       localStorage.setItem('admin_user', JSON.stringify(res.data.user));
       router.push('/');
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Registration failed. Please try again.');
+    } catch (err) {
+      setError(err.response?.data?.error || 'Login failed. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -81,10 +65,10 @@ export default function AdminRegister() {
         >
           <CardContent sx={{ p: { xs: 3, md: 4 } }}>
             <Typography variant="h4" gutterBottom textAlign="center" fontWeight={600}>
-              Admin Registration
+              Admin Login
             </Typography>
             <Typography variant="body2" color="text.secondary" textAlign="center" sx={{ mb: 4 }}>
-              Create a new admin account
+              Konfydence Admin Panel
             </Typography>
 
             {error && (
@@ -94,13 +78,6 @@ export default function AdminRegister() {
             )}
 
             <Box component="form" onSubmit={handleSubmit}>
-              <TextField
-                fullWidth
-                label="Name (optional)"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                sx={{ mb: 2 }}
-              />
               <TextField
                 fullWidth
                 label="Email"
@@ -117,16 +94,6 @@ export default function AdminRegister() {
                 required
                 value={formData.password}
                 onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                sx={{ mb: 2 }}
-                helperText="Minimum 6 characters"
-              />
-              <TextField
-                fullWidth
-                label="Confirm Password"
-                type="password"
-                required
-                value={formData.confirmPassword}
-                onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
                 sx={{ mb: 3 }}
               />
               <Button
@@ -136,16 +103,16 @@ export default function AdminRegister() {
                 size="large"
                 disabled={loading}
               >
-                {loading ? 'Registering...' : 'Register'}
+                {loading ? 'Logging in...' : 'Login'}
               </Button>
-              <Box sx={{ mt: 2, textAlign: 'center' }}>
+              {/* <Box sx={{ mt: 2, textAlign: 'center' }}>
                 <Typography variant="body2">
-                  Already have an account?{' '}
-                  <Link href="/login" style={{ color: 'inherit', textDecoration: 'underline', cursor: 'pointer' }}>
-                    Login
+                  Don't have an account?{' '}
+                  <Link href="/register" style={{ color: 'inherit', textDecoration: 'underline', cursor: 'pointer' }}>
+                    Register
                   </Link>
                 </Typography>
-              </Box>
+              </Box> */}
             </Box>
           </CardContent>
         </Card>

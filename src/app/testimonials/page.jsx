@@ -29,21 +29,20 @@ import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
 import api from '@/lib/api';
-import { Testimonial } from '@/lib/types';
 
 function TestimonialsContent() {
-  const [testimonials, setTestimonials] = useState<Testimonial[]>([]);
+  const [testimonials, setTestimonials] = useState([]);
   const [open, setOpen] = useState(false);
-  const [editing, setEditing] = useState<Testimonial | null>(null);
+  const [editing, setEditing] = useState(null);
   const [formData, setFormData] = useState({
     name: '',
     role: '',
     organization: '',
     quote: '',
-    segment: 'b2c' as 'b2b' | 'b2c' | 'b2e',
+    segment: 'b2c',
     isActive: true,
   });
-  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' });
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
 
   useEffect(() => {
     fetchTestimonials();
@@ -51,14 +50,14 @@ function TestimonialsContent() {
 
   const fetchTestimonials = async () => {
     try {
-      const res = await api.get<Testimonial[]>('/testimonials');
+      const res = await api.get('/testimonials');
       setTestimonials(res.data);
     } catch (error) {
       console.error('Error fetching testimonials:', error);
     }
   };
 
-  const handleOpen = (testimonial?: Testimonial) => {
+  const handleOpen = (testimonial) => {
     if (testimonial) {
       setEditing(testimonial);
       setFormData({
@@ -99,12 +98,12 @@ function TestimonialsContent() {
       }
       handleClose();
       fetchTestimonials();
-    } catch (error: any) {
+    } catch (error) {
       setSnackbar({ open: true, message: error.response?.data?.error || 'Error saving testimonial', severity: 'error' });
     }
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (id) => {
     if (confirm('Are you sure you want to delete this testimonial?')) {
       try {
         await api.delete(`/testimonials/${id}`);
@@ -151,8 +150,17 @@ function TestimonialsContent() {
             </TableRow>
           </TableHead>
           <TableBody>
-            {testimonials.map((testimonial) => (
-              <TableRow key={testimonial._id}>
+            {testimonials.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
+                  <Typography variant="body2" color="text.secondary">
+                    No testimonials found. Click "Add Testimonial" to create your first testimonial.
+                  </Typography>
+                </TableCell>
+              </TableRow>
+            ) : (
+              testimonials.map((testimonial) => (
+                <TableRow key={testimonial._id}>
                 <TableCell>{testimonial.name}</TableCell>
                 <TableCell>{testimonial.role}</TableCell>
                 <TableCell>{testimonial.organization}</TableCell>
@@ -167,7 +175,8 @@ function TestimonialsContent() {
                   </IconButton>
                 </TableCell>
               </TableRow>
-            ))}
+              ))
+            )}
           </TableBody>
         </Table>
       </TableContainer>

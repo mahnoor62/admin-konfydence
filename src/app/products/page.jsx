@@ -1,7 +1,7 @@
 'use client';
 
 import AdminLayout from '../layout-admin';
-import { useState, useEffect, useRef, ChangeEvent, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Box,
   Typography,
@@ -29,37 +29,19 @@ import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
 import api from '@/lib/api';
-import { Product } from '@/lib/types';
 import { Select, FormControl, InputLabel, OutlinedInput, Chip } from '@mui/material';
 
-interface ProductType {
-  _id: string;
-  name: string;
-  slug: string;
-  description?: string;
-  isActive: boolean;
-  sortOrder: number;
-}
-
-interface Badge {
-  _id: string;
-  name: string;
-  slug: string;
-  isActive: boolean;
-  sortOrder: number;
-}
-
 function ProductsContent() {
-  const [products, setProducts] = useState<Product[]>([]);
-  const [productTypes, setProductTypes] = useState<ProductType[]>([]);
-  const [badges, setBadges] = useState<Badge[]>([]);
+  const [products, setProducts] = useState([]);
+  const [productTypes, setProductTypes] = useState([]);
+  const [badges, setBadges] = useState([]);
   const [open, setOpen] = useState(false);
   const [typeDialogOpen, setTypeDialogOpen] = useState(false);
   const [badgeDialogOpen, setBadgeDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [productToDelete, setProductToDelete] = useState<Product | null>(null);
-  const [editing, setEditing] = useState<Product | null>(null);
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [productToDelete, setProductToDelete] = useState(null);
+  const [editing, setEditing] = useState(null);
+  const fileInputRef = useRef(null);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
@@ -68,7 +50,7 @@ function ProductsContent() {
     price: '',
     type: '',
     imageUrl: '',
-    badges: [] as string[],
+    badges: [],
     isActive: true,
     sortOrder: 0,
   });
@@ -78,11 +60,11 @@ function ProductsContent() {
   const [badgeFormData, setBadgeFormData] = useState({
     name: '',
   });
-  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' });
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
 
   const fetchProducts = useCallback(async () => {
     try {
-      const res = await api.get<Product[]>('/products', {
+      const res = await api.get('/products', {
         params: { includeInactive: true, all: true },
       });
       setProducts(res.data);
@@ -93,7 +75,7 @@ function ProductsContent() {
 
   const fetchProductTypes = useCallback(async () => {
     try {
-      const res = await api.get<ProductType[]>('/product-types', {
+      const res = await api.get('/product-types', {
         params: { active: 'true' },
       });
       setProductTypes(res.data);
@@ -112,7 +94,7 @@ function ProductsContent() {
 
   const fetchBadges = useCallback(async () => {
     try {
-      const res = await api.get<Badge[]>('/badges', {
+      const res = await api.get('/badges', {
         params: { active: 'true' },
       });
       setBadges(res.data);
@@ -127,7 +109,7 @@ function ProductsContent() {
     fetchBadges();
   }, [fetchProducts, fetchProductTypes, fetchBadges]);
 
-  const handleOpen = (product?: Product) => {
+  const handleOpen = (product) => {
     if (product) {
       setEditing(product);
       setFormData({
@@ -181,7 +163,7 @@ function ProductsContent() {
       setSnackbar({ open: true, message: 'Product type created successfully', severity: 'success' });
       handleTypeDialogClose();
       fetchProductTypes();
-    } catch (error: any) {
+    } catch (error) {
       setSnackbar({ open: true, message: error.response?.data?.error || 'Error creating product type', severity: 'error' });
     }
   };
@@ -209,7 +191,7 @@ function ProductsContent() {
       setSnackbar({ open: true, message: 'Badge created successfully', severity: 'success' });
       handleBadgeDialogClose();
       fetchBadges();
-    } catch (error: any) {
+    } catch (error) {
       setSnackbar({ open: true, message: error.response?.data?.error || 'Error creating badge', severity: 'error' });
     }
   };
@@ -263,7 +245,7 @@ function ProductsContent() {
       }
       handleClose();
       fetchProducts();
-    } catch (error: any) {
+    } catch (error) {
       // Handle different error response formats
       let errorMessage = 'Error saving product';
       
@@ -272,7 +254,7 @@ function ProductsContent() {
         
         // Handle validation errors array
         if (errorData.errors && Array.isArray(errorData.errors)) {
-          errorMessage = errorData.errors.map((err: any) => err.msg || err.message || err).join(', ');
+          errorMessage = errorData.errors.map((err) => err.msg || err.message || err).join(', ');
         }
         // Handle single error message
         else if (errorData.error) {
@@ -290,7 +272,7 @@ function ProductsContent() {
     }
   };
 
-  const handleDeleteClick = (product: Product) => {
+  const handleDeleteClick = (product) => {
     setProductToDelete(product);
     setDeleteDialogOpen(true);
   };
@@ -304,13 +286,13 @@ function ProductsContent() {
       setDeleteDialogOpen(false);
       setProductToDelete(null);
       fetchProducts();
-    } catch (error: any) {
+    } catch (error) {
       let errorMessage = 'Error deleting product';
       
       if (error.response?.data) {
         const errorData = error.response.data;
         if (errorData.errors && Array.isArray(errorData.errors)) {
-          errorMessage = errorData.errors.map((err: any) => err.msg || err.message || err).join(', ');
+          errorMessage = errorData.errors.map((err) => err.msg || err.message || err).join(', ');
         } else if (errorData.error) {
           errorMessage = errorData.error;
         } else if (typeof errorData === 'string') {
@@ -333,14 +315,14 @@ function ProductsContent() {
     fileInputRef.current?.click();
   };
 
-  const handleImageUpload = async (event: ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
     const form = new FormData();
     form.append('file', file);
     try {
       setUploadingImage(true);
-      const res = await api.post<{ url: string }>('/uploads', form, {
+      const res = await api.post('/uploads', form, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
       setFormData((prev) => ({ ...prev, imageUrl: res.data.url }));
@@ -392,8 +374,17 @@ function ProductsContent() {
               </TableRow>
             </TableHead>
             <TableBody>
-              {products.map((product) => (
-                <TableRow key={product._id}>
+              {products.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
+                    <Typography variant="body2" color="text.secondary">
+                      No products found. Click "Add Product" to create your first product.
+                    </Typography>
+                  </TableCell>
+                </TableRow>
+              ) : (
+                products.map((product) => (
+                  <TableRow key={product._id}>
                   <TableCell>
                     {product.imageUrl ? (
                       <Box
@@ -439,7 +430,8 @@ function ProductsContent() {
                     </IconButton>
                   </TableCell>
                 </TableRow>
-              ))}
+                ))
+              )}
             </TableBody>
           </Table>
         </TableContainer>
@@ -542,7 +534,7 @@ function ProductsContent() {
                   <Select
                     multiple
                     value={formData.badges}
-                    onChange={(e) => setFormData({ ...formData, badges: e.target.value as string[] })}
+                    onChange={(e) => setFormData({ ...formData, badges: e.target.value })}
                     input={<OutlinedInput label="Badges" />}
                     renderValue={(selected) => (
                       <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>

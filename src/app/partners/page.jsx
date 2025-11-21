@@ -29,22 +29,21 @@ import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
 import api from '@/lib/api';
-import { PartnerLogo } from '@/lib/types';
 
 function PartnersContent() {
-  const [partners, setPartners] = useState<PartnerLogo[]>([]);
+  const [partners, setPartners] = useState([]);
   const [open, setOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [partnerToDelete, setPartnerToDelete] = useState<PartnerLogo | null>(null);
-  const [editing, setEditing] = useState<PartnerLogo | null>(null);
+  const [partnerToDelete, setPartnerToDelete] = useState(null);
+  const [editing, setEditing] = useState(null);
   const [formData, setFormData] = useState({
     name: '',
     logoUrl: '',
     linkUrl: '',
-    type: 'partner' as 'press' | 'partner' | 'event',
+    type: 'partner',
     isActive: true,
   });
-  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' });
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
 
   useEffect(() => {
     fetchPartners();
@@ -52,14 +51,14 @@ function PartnersContent() {
 
   const fetchPartners = async () => {
     try {
-      const res = await api.get<PartnerLogo[]>('/partners');
+      const res = await api.get('/partners');
       setPartners(res.data);
     } catch (error) {
       console.error('Error fetching partners:', error);
     }
   };
 
-  const handleOpen = (partner?: PartnerLogo) => {
+  const handleOpen = (partner) => {
     if (partner) {
       setEditing(partner);
       setFormData({
@@ -112,13 +111,13 @@ function PartnersContent() {
       }
       handleClose();
       fetchPartners();
-    } catch (error: any) {
+    } catch (error) {
       let errorMessage = 'Error saving partner logo';
       
       if (error.response?.data) {
         const errorData = error.response.data;
         if (errorData.errors && Array.isArray(errorData.errors)) {
-          errorMessage = errorData.errors.map((err: any) => err.msg || err.message || err).join(', ');
+          errorMessage = errorData.errors.map((err) => err.msg || err.message || err).join(', ');
         } else if (errorData.error) {
           errorMessage = errorData.error;
         } else if (typeof errorData === 'string') {
@@ -132,7 +131,7 @@ function PartnersContent() {
     }
   };
 
-  const handleDeleteClick = (partner: PartnerLogo) => {
+  const handleDeleteClick = (partner) => {
     setPartnerToDelete(partner);
     setDeleteDialogOpen(true);
   };
@@ -146,7 +145,7 @@ function PartnersContent() {
       setDeleteDialogOpen(false);
       setPartnerToDelete(null);
       fetchPartners();
-    } catch (error: any) {
+    } catch (error) {
       let errorMessage = 'Error deleting partner logo';
       
       if (error.response?.data?.error) {
@@ -198,8 +197,17 @@ function PartnersContent() {
             </TableRow>
           </TableHead>
           <TableBody>
-            {partners.map((partner) => (
-              <TableRow key={partner._id}>
+            {partners.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={5} align="center" sx={{ py: 4 }}>
+                  <Typography variant="body2" color="text.secondary">
+                    No partner logos found. Click "Add Partner Logo" to create your first partner logo.
+                  </Typography>
+                </TableCell>
+              </TableRow>
+            ) : (
+              partners.map((partner) => (
+                <TableRow key={partner._id}>
                 <TableCell>{partner.name}</TableCell>
                 <TableCell>{partner.type}</TableCell>
                 <TableCell>
@@ -220,7 +228,8 @@ function PartnersContent() {
                   </IconButton>
                 </TableCell>
               </TableRow>
-            ))}
+              ))
+            )}
           </TableBody>
         </Table>
       </TableContainer>
@@ -255,7 +264,7 @@ function PartnersContent() {
               fullWidth
               required
               value={formData.type}
-              onChange={(e) => setFormData({ ...formData, type: e.target.value as any })}
+              onChange={(e) => setFormData({ ...formData, type: e.target.value })}
             >
               <MenuItem value="press">Press</MenuItem>
               <MenuItem value="partner">Partner</MenuItem>

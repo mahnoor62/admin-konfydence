@@ -1,7 +1,7 @@
 'use client';
 
 import AdminLayout from '../layout-admin';
-import { useState, useEffect, useRef, ChangeEvent, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Box,
   Typography,
@@ -34,35 +34,18 @@ import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
 import api from '@/lib/api';
-import { BlogPost } from '@/lib/types';
-
-interface BlogCategory {
-  _id: string;
-  name: string;
-  slug: string;
-  isActive: boolean;
-  sortOrder: number;
-}
-
-interface BlogTag {
-  _id: string;
-  name: string;
-  slug: string;
-  isActive: boolean;
-  sortOrder: number;
-}
 
 function BlogContent() {
-  const [posts, setPosts] = useState<BlogPost[]>([]);
-  const [categories, setCategories] = useState<BlogCategory[]>([]);
-  const [tags, setTags] = useState<BlogTag[]>([]);
+  const [posts, setPosts] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [tags, setTags] = useState([]);
   const [open, setOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
   const [tagDialogOpen, setTagDialogOpen] = useState(false);
-  const [postToDelete, setPostToDelete] = useState<BlogPost | null>(null);
-  const [editing, setEditing] = useState<BlogPost | null>(null);
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [postToDelete, setPostToDelete] = useState(null);
+  const [editing, setEditing] = useState(null);
+  const fileInputRef = useRef(null);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [formData, setFormData] = useState({
     title: '',
@@ -70,23 +53,23 @@ function BlogContent() {
     excerpt: '',
     content: '',
     featuredImage: '',
-    tags: [] as string[],
+    tags: [],
     category: '',
     isPublished: false,
   });
   const [categoryFormData, setCategoryFormData] = useState({ name: '' });
   const [tagFormData, setTagFormData] = useState({ name: '' });
-  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' });
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
 
   const fetchPosts = useCallback(async () => {
     try {
-      const res = await api.get<{ posts: BlogPost[] } | BlogPost[]>('/blog', {
+      const res = await api.get('/blog', {
         params: { all: true },
       });
       // Handle both response formats: { posts: [...] } or [...]
-      const posts = Array.isArray(res.data) ? res.data : (res.data.posts || []);
+      const posts = Array.isArray(res.data) ? res.data : res.data.posts || [];
       setPosts(posts);
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error fetching posts:', error);
       let errorMessage = 'Failed to load blog posts';
       if (error.response?.data?.error) {
@@ -98,7 +81,7 @@ function BlogContent() {
 
   const fetchCategories = useCallback(async () => {
     try {
-      const res = await api.get<BlogCategory[]>('/blog-categories', {
+      const res = await api.get('/blog-categories', {
         params: { active: 'true' },
       });
       setCategories(res.data);
@@ -117,7 +100,7 @@ function BlogContent() {
 
   const fetchTags = useCallback(async () => {
     try {
-      const res = await api.get<BlogTag[]>('/blog-tags', {
+      const res = await api.get('/blog-tags', {
         params: { active: 'true' },
       });
       setTags(res.data);
@@ -132,7 +115,7 @@ function BlogContent() {
     fetchTags();
   }, [fetchPosts, fetchCategories, fetchTags]);
 
-  const handleOpen = (post?: BlogPost) => {
+  const handleOpen = (post) => {
     if (post) {
       setEditing(post);
       // Map tags to slugs if they exist in tags list
@@ -211,13 +194,13 @@ function BlogContent() {
       }
       handleClose();
       fetchPosts();
-    } catch (error: any) {
+    } catch (error) {
       let errorMessage = 'Error saving post';
       
       if (error.response?.data) {
         const errorData = error.response.data;
         if (errorData.errors && Array.isArray(errorData.errors)) {
-          errorMessage = errorData.errors.map((err: any) => err.msg || err.message || err).join(', ');
+          errorMessage = errorData.errors.map((err) => err.msg || err.message || err).join(', ');
         } else if (errorData.error) {
           errorMessage = errorData.error;
         } else if (typeof errorData === 'string') {
@@ -231,7 +214,7 @@ function BlogContent() {
     }
   };
 
-  const handleDeleteClick = (post: BlogPost) => {
+  const handleDeleteClick = (post) => {
     setPostToDelete(post);
     setDeleteDialogOpen(true);
   };
@@ -246,7 +229,7 @@ function BlogContent() {
       setPostToDelete(null);
       // Refresh the posts list after deletion
       await fetchPosts();
-    } catch (error: any) {
+    } catch (error) {
       console.error('Delete error:', error);
       let errorMessage = 'Error deleting post';
       
@@ -293,7 +276,7 @@ function BlogContent() {
       setSnackbar({ open: true, message: 'Category created successfully', severity: 'success' });
       handleCategoryDialogClose();
       fetchCategories();
-    } catch (error: any) {
+    } catch (error) {
       setSnackbar({ open: true, message: error.response?.data?.error || 'Error creating category', severity: 'error' });
     }
   };
@@ -319,7 +302,7 @@ function BlogContent() {
       setSnackbar({ open: true, message: 'Tag created successfully', severity: 'success' });
       handleTagDialogClose();
       fetchTags();
-    } catch (error: any) {
+    } catch (error) {
       setSnackbar({ open: true, message: error.response?.data?.error || 'Error creating tag', severity: 'error' });
     }
   };
@@ -328,7 +311,7 @@ function BlogContent() {
     fileInputRef.current?.click();
   };
 
-  const handleImageUpload = async (event: ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
     const form = new FormData();
@@ -386,8 +369,17 @@ function BlogContent() {
             </TableRow>
           </TableHead>
           <TableBody>
-            {posts.map((post) => (
-              <TableRow key={post._id}>
+            {posts.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
+                  <Typography variant="body2" color="text.secondary">
+                    No blog posts found. Click "Add Post" to create your first blog post.
+                  </Typography>
+                </TableCell>
+              </TableRow>
+            ) : (
+              posts.map((post) => (
+                <TableRow key={post._id}>
                 <TableCell>
                   {post.featuredImage ? (
                     <Box
@@ -445,7 +437,8 @@ function BlogContent() {
                   </IconButton>
                 </TableCell>
               </TableRow>
-            ))}
+              ))
+            )}
           </TableBody>
         </Table>
       </TableContainer>
@@ -555,7 +548,7 @@ function BlogContent() {
                 <Select
                   multiple
                   value={formData.tags}
-                  onChange={(e) => setFormData({ ...formData, tags: e.target.value as string[] })}
+                  onChange={(e) => setFormData({ ...formData, tags: e.target.value })}
                   input={<OutlinedInput label="Tags" />}
                   renderValue={(selected) => (
                     <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>

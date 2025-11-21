@@ -41,12 +41,12 @@ const menuItems = [
   // { label: 'Admins', href: '/admins', icon: PeopleIcon },
 ];
 
-export default function AdminLayout({ children }: { children: React.ReactNode }) {
+export default function AdminLayout({ children }) {
   const router = useRouter();
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
-  const [user, setUser] = useState<any>(null);
+  const [anchorEl, setAnchorEl] = useState(null);
+  const [user, setUser] = useState(null);
 
   useEffect(() => {
     const token = localStorage.getItem('admin_token');
@@ -66,7 +66,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     setMobileOpen(!mobileOpen);
   };
 
-  const handleMenuClick = (event: React.MouseEvent<HTMLElement>) => {
+  const handleMenuClick = (event) => {
     setAnchorEl(event.currentTarget);
   };
 

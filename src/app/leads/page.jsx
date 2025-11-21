@@ -21,15 +21,8 @@ import {
   Alert,
 } from '@mui/material';
 import api from '@/lib/api';
-import { B2BLead, EducationLead, ContactMessage } from '@/lib/types';
 
-interface TabPanelProps {
-  children?: React.ReactNode;
-  index: number;
-  value: number;
-}
-
-function TabPanel(props: TabPanelProps) {
+function TabPanel(props) {
   const { children, value, index, ...other } = props;
   return (
     <div role="tabpanel" hidden={value !== index} {...other}>
@@ -40,10 +33,10 @@ function TabPanel(props: TabPanelProps) {
 
 function LeadsContent() {
   const [tab, setTab] = useState(0);
-  const [b2bLeads, setB2bLeads] = useState<B2BLead[]>([]);
-  const [eduLeads, setEduLeads] = useState<EducationLead[]>([]);
-  const [contactMessages, setContactMessages] = useState<ContactMessage[]>([]);
-  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' });
+  const [b2bLeads, setB2bLeads] = useState([]);
+  const [eduLeads, setEduLeads] = useState([]);
+  const [contactMessages, setContactMessages] = useState([]);
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
 
   useEffect(() => {
     fetchLeads();
@@ -52,9 +45,9 @@ function LeadsContent() {
   const fetchLeads = async () => {
     try {
       const [b2b, edu, contact] = await Promise.all([
-        api.get<B2BLead[]>('/leads/b2b').then((res) => res.data),
-        api.get<EducationLead[]>('/leads/education').then((res) => res.data),
-        api.get<ContactMessage[]>('/contact').then((res) => res.data),
+        api.get('/leads/b2b').then((res) => res.data),
+        api.get('/leads/education').then((res) => res.data),
+        api.get('/contact').then((res) => res.data),
       ]);
       setB2bLeads(b2b);
       setEduLeads(edu);
@@ -64,7 +57,7 @@ function LeadsContent() {
     }
   };
 
-  const handleStatusChange = async (type: 'b2b' | 'education' | 'contact', id: string, status: string) => {
+  const handleStatusChange = async (type, id, status) => {
     try {
       if (type === 'b2b') {
         await api.put(`/leads/b2b/${id}`, { status });
@@ -108,8 +101,17 @@ function LeadsContent() {
               </TableRow>
             </TableHead>
             <TableBody>
-              {b2bLeads.map((lead) => (
-                <TableRow key={lead._id}>
+              {b2bLeads.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
+                    <Typography variant="body2" color="text.secondary">
+                      No B2B leads found.
+                    </Typography>
+                  </TableCell>
+                </TableRow>
+              ) : (
+                b2bLeads.map((lead) => (
+                  <TableRow key={lead._id}>
                   <TableCell>{lead.name}</TableCell>
                   <TableCell>{lead.company}</TableCell>
                   <TableCell>{lead.email}</TableCell>
@@ -128,7 +130,8 @@ function LeadsContent() {
                   </TableCell>
                   <TableCell>{new Date(lead.createdAt).toLocaleDateString()}</TableCell>
                 </TableRow>
-              ))}
+                ))
+              )}
             </TableBody>
           </Table>
         </TableContainer>
@@ -149,8 +152,17 @@ function LeadsContent() {
               </TableRow>
             </TableHead>
             <TableBody>
-              {eduLeads.map((lead) => (
-                <TableRow key={lead._id}>
+              {eduLeads.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
+                    <Typography variant="body2" color="text.secondary">
+                      No education leads found.
+                    </Typography>
+                  </TableCell>
+                </TableRow>
+              ) : (
+                eduLeads.map((lead) => (
+                  <TableRow key={lead._id}>
                   <TableCell>{lead.schoolName}</TableCell>
                   <TableCell>{lead.contactName}</TableCell>
                   <TableCell>{lead.role}</TableCell>
@@ -170,7 +182,8 @@ function LeadsContent() {
                   </TableCell>
                   <TableCell>{new Date(lead.createdAt).toLocaleDateString()}</TableCell>
                 </TableRow>
-              ))}
+                ))
+              )}
             </TableBody>
           </Table>
         </TableContainer>
@@ -190,8 +203,17 @@ function LeadsContent() {
               </TableRow>
             </TableHead>
             <TableBody>
-              {contactMessages.map((message) => (
-                <TableRow key={message._id}>
+              {contactMessages.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
+                    <Typography variant="body2" color="text.secondary">
+                      No contact messages found.
+                    </Typography>
+                  </TableCell>
+                </TableRow>
+              ) : (
+                contactMessages.map((message) => (
+                  <TableRow key={message._id}>
                   <TableCell>{message.name}</TableCell>
                   <TableCell>{message.email}</TableCell>
                   <TableCell>{message.company || '-'}</TableCell>
@@ -212,7 +234,8 @@ function LeadsContent() {
                   </TableCell>
                   <TableCell>{new Date(message.createdAt).toLocaleDateString()}</TableCell>
                 </TableRow>
-              ))}
+                ))
+              )}
             </TableBody>
           </Table>
         </TableContainer>

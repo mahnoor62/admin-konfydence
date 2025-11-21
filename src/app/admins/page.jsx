@@ -29,24 +29,15 @@ import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import api from '@/lib/api';
 
-interface Admin {
-  _id: string;
-  email: string;
-  name?: string;
-  isActive: boolean;
-  lastLogin?: string;
-  createdAt: string;
-}
-
 function AdminsContent() {
-  const [admins, setAdmins] = useState<Admin[]>([]);
+  const [admins, setAdmins] = useState([]);
   const [open, setOpen] = useState(false);
-  const [editing, setEditing] = useState<Admin | null>(null);
+  const [editing, setEditing] = useState(null);
   const [formData, setFormData] = useState({
     name: '',
     isActive: true,
   });
-  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' });
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
 
   useEffect(() => {
     fetchAdmins();
@@ -54,14 +45,14 @@ function AdminsContent() {
 
   const fetchAdmins = async () => {
     try {
-      const res = await api.get<Admin[]>('/auth/admins');
+      const res = await api.get('/auth/admins');
       setAdmins(res.data);
     } catch (error) {
       console.error('Error fetching admins:', error);
     }
   };
 
-  const handleOpen = (admin?: Admin) => {
+  const handleOpen = (admin) => {
     if (admin) {
       setEditing(admin);
       setFormData({
@@ -85,18 +76,18 @@ function AdminsContent() {
       setSnackbar({ open: true, message: 'Admin updated successfully', severity: 'success' });
       handleClose();
       fetchAdmins();
-    } catch (error: any) {
+    } catch (error) {
       setSnackbar({ open: true, message: error.response?.data?.error || 'Error updating admin', severity: 'error' });
     }
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (id) => {
     if (confirm('Are you sure you want to delete this admin?')) {
       try {
         await api.delete(`/auth/admins/${id}`);
         setSnackbar({ open: true, message: 'Admin deleted successfully', severity: 'success' });
         fetchAdmins();
-      } catch (error: any) {
+      } catch (error) {
         setSnackbar({ open: true, message: error.response?.data?.error || 'Error deleting admin', severity: 'error' });
       }
     }

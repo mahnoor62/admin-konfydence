@@ -11,10 +11,9 @@ import {
   Alert,
 } from '@mui/material';
 import api from '@/lib/api';
-import { SiteSettings } from '@/lib/types';
 
 function SettingsContent() {
-  const [settings, setSettings] = useState<SiteSettings | null>(null);
+  const [settings, setSettings] = useState(null);
   const [formData, setFormData] = useState({
     heroB2CTitle: '',
     heroB2CSubtext: '',
@@ -28,7 +27,7 @@ function SettingsContent() {
     founderQuote: '',
     founderName: '',
   });
-  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' });
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
 
   useEffect(() => {
     fetchSettings();
@@ -36,7 +35,7 @@ function SettingsContent() {
 
   const fetchSettings = async () => {
     try {
-      const res = await api.get<SiteSettings>('/settings');
+      const res = await api.get('/settings');
       setSettings(res.data);
       setFormData({
         heroB2CTitle: res.data.heroB2CTitle,
