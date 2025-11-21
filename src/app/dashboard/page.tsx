@@ -17,25 +17,53 @@ export default function AdminDashboard() {
   useEffect(() => {
     async function fetchStats() {
       try {
-        const [products, blog, testimonials, b2bLeads, eduLeads, contact] = await Promise.all([
-          api.get('/products').then((res) => res.data.length),
-          api.get('/blog').then((res) => res.data.posts?.length || 0),
-          api.get('/testimonials').then((res) => res.data.length),
-          api.get('/leads/b2b').then((res) => res.data.length),
-          api.get('/leads/education').then((res) => res.data.length),
-          api.get('/contact').then((res) => res.data.length),
+        // Fetch all items with proper parameters to get complete counts
+        // Use includeInactive=true for products to get all products (active + inactive) for accurate dashboard counts
+        const [productsRes, blogRes, testimonialsRes, b2bLeadsRes, eduLeadsRes, contactRes] = await Promise.all([
+          api.get('/products', { params: { all: true, includeInactive: true } }),
+          api.get('/blog', { params: { all: true } }),
+          api.get('/testimonials'),
+          api.get('/leads/b2b'),
+          api.get('/leads/education'),
+          api.get('/contact'),
         ]);
+
+        // Handle different response formats
+        const products = Array.isArray(productsRes.data) 
+          ? productsRes.data.length 
+          : (productsRes.data.products?.length || productsRes.data.length || 0);
+        
+        const blogPosts = Array.isArray(blogRes.data) 
+          ? blogRes.data.length 
+          : (blogRes.data.posts?.length || 0);
+        
+        const testimonials = Array.isArray(testimonialsRes.data) 
+          ? testimonialsRes.data.length 
+          : 0;
+        
+        const b2bLeads = Array.isArray(b2bLeadsRes.data) 
+          ? b2bLeadsRes.data.length 
+          : 0;
+        
+        const eduLeads = Array.isArray(eduLeadsRes.data) 
+          ? eduLeadsRes.data.length 
+          : 0;
+        
+        const contactMessages = Array.isArray(contactRes.data) 
+          ? contactRes.data.length 
+          : 0;
 
         setStats({
           products,
-          blogPosts: blog,
+          blogPosts,
           testimonials,
           b2bLeads,
           educationLeads: eduLeads,
-          contactMessages: contact,
+          contactMessages,
         });
       } catch (error) {
         console.error('Error fetching stats:', error);
+        // Set error state or show notification
       }
     }
     fetchStats();
@@ -44,7 +72,7 @@ export default function AdminDashboard() {
   const statCards = [
     { title: 'Products', value: stats.products, accent: 'primary.main' },
     { title: 'Blog Posts', value: stats.blogPosts, accent: 'secondary.main' },
-    { title: 'Testimonials', value: stats.testimonials, accent: 'warning.main' },
+    // { title: 'Testimonials', value: stats.testimonials, accent: 'warning.main' },
     { title: 'B2B Leads', value: stats.b2bLeads, accent: 'success.main' },
     { title: 'Education Leads', value: stats.educationLeads, accent: 'info.main' },
     { title: 'Contact Messages', value: stats.contactMessages, accent: 'secondary.main' },

@@ -25,7 +25,6 @@ import ArticleIcon from '@mui/icons-material/Article';
 import RateReviewIcon from '@mui/icons-material/RateReview';
 import BusinessIcon from '@mui/icons-material/Business';
 import ContactMailIcon from '@mui/icons-material/ContactMail';
-import SettingsIcon from '@mui/icons-material/Settings';
 import LogoutIcon from '@mui/icons-material/Logout';
 import MenuIcon from '@mui/icons-material/Menu';
 import PeopleIcon from '@mui/icons-material/People';
@@ -36,11 +35,10 @@ const menuItems = [
   { label: 'Dashboard', href: '/', icon: DashboardIcon },
   { label: 'Products', href: '/products', icon: ShoppingBagIcon },
   { label: 'Blog Posts', href: '/blog', icon: ArticleIcon },
-  { label: 'Testimonials', href: '/testimonials', icon: RateReviewIcon },
+  // { label: 'Testimonials', href: '/testimonials', icon: RateReviewIcon },
   { label: 'Partner Logos', href: '/partners', icon: BusinessIcon },
   { label: 'Leads', href: '/leads', icon: ContactMailIcon },
-  { label: 'Admins', href: '/admins', icon: PeopleIcon },
-  { label: 'Site Settings', href: '/settings', icon: SettingsIcon },
+  // { label: 'Admins', href: '/admins', icon: PeopleIcon },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {

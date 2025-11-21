@@ -4,7 +4,7 @@ export interface Product {
   slug: string;
   description: string;
   price: number;
-  type: 'starter' | 'bundle' | 'membership';
+  type: string;
   isActive: boolean;
   imageUrl: string;
   badges?: string[];

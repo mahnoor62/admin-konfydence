@@ -34,6 +34,8 @@ import { PartnerLogo } from '@/lib/types';
 function PartnersContent() {
   const [partners, setPartners] = useState<PartnerLogo[]>([]);
   const [open, setOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [partnerToDelete, setPartnerToDelete] = useState<PartnerLogo | null>(null);
   const [editing, setEditing] = useState<PartnerLogo | null>(null);
   const [formData, setFormData] = useState({
     name: '',
@@ -87,6 +89,20 @@ function PartnersContent() {
 
   const handleSubmit = async () => {
     try {
+      // Client-side validation
+      if (!formData.name.trim()) {
+        setSnackbar({ open: true, message: 'Partner name is required', severity: 'error' });
+        return;
+      }
+      if (!formData.logoUrl.trim()) {
+        setSnackbar({ open: true, message: 'Logo URL is required', severity: 'error' });
+        return;
+      }
+      if (!formData.type) {
+        setSnackbar({ open: true, message: 'Partner type is required', severity: 'error' });
+        return;
+      }
+
       if (editing) {
         await api.put(`/partners/${editing._id}`, formData);
         setSnackbar({ open: true, message: 'Partner logo updated successfully', severity: 'success' });
@@ -97,27 +113,75 @@ function PartnersContent() {
       handleClose();
       fetchPartners();
     } catch (error: any) {
-      setSnackbar({ open: true, message: error.response?.data?.error || 'Error saving partner logo', severity: 'error' });
+      let errorMessage = 'Error saving partner logo';
+      
+      if (error.response?.data) {
+        const errorData = error.response.data;
+        if (errorData.errors && Array.isArray(errorData.errors)) {
+          errorMessage = errorData.errors.map((err: any) => err.msg || err.message || err).join(', ');
+        } else if (errorData.error) {
+          errorMessage = errorData.error;
+        } else if (typeof errorData === 'string') {
+          errorMessage = errorData;
+        }
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+
+      setSnackbar({ open: true, message: errorMessage, severity: 'error' });
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (confirm('Are you sure you want to delete this partner logo?')) {
-      try {
-        await api.delete(`/partners/${id}`);
-        setSnackbar({ open: true, message: 'Partner logo deleted successfully', severity: 'success' });
-        fetchPartners();
-      } catch (error) {
-        setSnackbar({ open: true, message: 'Error deleting partner logo', severity: 'error' });
+  const handleDeleteClick = (partner: PartnerLogo) => {
+    setPartnerToDelete(partner);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!partnerToDelete) return;
+    
+    try {
+      await api.delete(`/partners/${partnerToDelete._id}`);
+      setSnackbar({ open: true, message: 'Partner logo deleted successfully', severity: 'success' });
+      setDeleteDialogOpen(false);
+      setPartnerToDelete(null);
+      fetchPartners();
+    } catch (error: any) {
+      let errorMessage = 'Error deleting partner logo';
+      
+      if (error.response?.data?.error) {
+        errorMessage = error.response.data.error;
+      } else if (error.message) {
+        errorMessage = error.message;
       }
+
+      setSnackbar({ open: true, message: errorMessage, severity: 'error' });
     }
+  };
+
+  const handleDeleteCancel = () => {
+    setDeleteDialogOpen(false);
+    setPartnerToDelete(null);
   };
 
   return (
     <Box>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
         <Typography variant="h4">Partner Logos</Typography>
-        <Button variant="contained" startIcon={<AddIcon />} onClick={() => handleOpen()}>
+        <Button
+          variant="contained"
+          startIcon={<AddIcon />}
+          onClick={() => handleOpen()}
+          sx={{
+            bgcolor: 'primary.main',
+            '&:hover': {
+              bgcolor: 'primary.dark',
+              transform: 'translateY(-2px)',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+            },
+            transition: 'all 0.3s ease',
+          }}
+        >
           Add Partner Logo
         </Button>
       </Box>
@@ -151,7 +215,7 @@ function PartnersContent() {
                   <IconButton size="small" onClick={() => handleOpen(partner)}>
                     <EditIcon />
                   </IconButton>
-                  <IconButton size="small" onClick={() => handleDelete(partner._id)}>
+                  <IconButton size="small" onClick={() => handleDeleteClick(partner)}>
                     <DeleteIcon />
                   </IconButton>
                 </TableCell>
@@ -212,6 +276,21 @@ function PartnersContent() {
           <Button onClick={handleClose}>Cancel</Button>
           <Button onClick={handleSubmit} variant="contained">
             {editing ? 'Update' : 'Create'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={deleteDialogOpen} onClose={handleDeleteCancel} maxWidth="sm" fullWidth>
+        <DialogTitle>Delete Partner Logo</DialogTitle>
+        <DialogContent>
+          <Typography>
+            Are you sure you want to delete &ldquo;{partnerToDelete?.name}&rdquo;? This action cannot be undone.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleDeleteCancel}>Cancel</Button>
+          <Button onClick={handleDeleteConfirm} variant="contained" color="error">
+            Delete
           </Button>
         </DialogActions>
       </Dialog>

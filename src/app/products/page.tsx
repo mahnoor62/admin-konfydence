@@ -1,7 +1,7 @@
 'use client';
 
 import AdminLayout from '../layout-admin';
-import { useState, useEffect, useRef, ChangeEvent } from 'react';
+import { useState, useEffect, useRef, ChangeEvent, useCallback } from 'react';
 import {
   Box,
   Typography,
@@ -30,10 +30,34 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
 import api from '@/lib/api';
 import { Product } from '@/lib/types';
+import { Select, FormControl, InputLabel, OutlinedInput, Chip } from '@mui/material';
+
+interface ProductType {
+  _id: string;
+  name: string;
+  slug: string;
+  description?: string;
+  isActive: boolean;
+  sortOrder: number;
+}
+
+interface Badge {
+  _id: string;
+  name: string;
+  slug: string;
+  isActive: boolean;
+  sortOrder: number;
+}
 
 function ProductsContent() {
   const [products, setProducts] = useState<Product[]>([]);
+  const [productTypes, setProductTypes] = useState<ProductType[]>([]);
+  const [badges, setBadges] = useState<Badge[]>([]);
   const [open, setOpen] = useState(false);
+  const [typeDialogOpen, setTypeDialogOpen] = useState(false);
+  const [badgeDialogOpen, setBadgeDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [productToDelete, setProductToDelete] = useState<Product | null>(null);
   const [editing, setEditing] = useState<Product | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
@@ -42,19 +66,21 @@ function ProductsContent() {
     slug: '',
     description: '',
     price: '',
-    type: 'starter' as 'starter' | 'bundle' | 'membership',
+    type: '',
     imageUrl: '',
-    badges: '',
+    badges: [] as string[],
     isActive: true,
     sortOrder: 0,
   });
+  const [typeFormData, setTypeFormData] = useState({
+    name: '',
+  });
+  const [badgeFormData, setBadgeFormData] = useState({
+    name: '',
+  });
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' });
 
-  useEffect(() => {
-    fetchProducts();
-  }, []);
-
-  const fetchProducts = async () => {
+  const fetchProducts = useCallback(async () => {
     try {
       const res = await api.get<Product[]>('/products', {
         params: { includeInactive: true, all: true },
@@ -63,7 +89,43 @@ function ProductsContent() {
     } catch (error) {
       console.error('Error fetching products:', error);
     }
-  };
+  }, []);
+
+  const fetchProductTypes = useCallback(async () => {
+    try {
+      const res = await api.get<ProductType[]>('/product-types', {
+        params: { active: 'true' },
+      });
+      setProductTypes(res.data);
+      if (res.data.length > 0) {
+        setFormData((prev) => {
+          if (prev.type) {
+            return prev;
+          }
+          return { ...prev, type: res.data[0].slug };
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching product types:', error);
+    }
+  }, []);
+
+  const fetchBadges = useCallback(async () => {
+    try {
+      const res = await api.get<Badge[]>('/badges', {
+        params: { active: 'true' },
+      });
+      setBadges(res.data);
+    } catch (error) {
+      console.error('Error fetching badges:', error);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchProducts();
+    fetchProductTypes();
+    fetchBadges();
+  }, [fetchProducts, fetchProductTypes, fetchBadges]);
 
   const handleOpen = (product?: Product) => {
     if (product) {
@@ -75,7 +137,7 @@ function ProductsContent() {
         price: product.price.toString(),
         type: product.type,
         imageUrl: product.imageUrl,
-        badges: product.badges?.join(', ') || '',
+        badges: product.badges || [],
         isActive: product.isActive,
         sortOrder: product.sortOrder,
       });
@@ -86,14 +148,70 @@ function ProductsContent() {
         slug: '',
         description: '',
         price: '',
-        type: 'starter',
+        type: productTypes.length > 0 ? productTypes[0].slug : '',
         imageUrl: '',
-        badges: '',
+        badges: [],
         isActive: true,
         sortOrder: 0,
       });
     }
     setOpen(true);
+  };
+
+  const handleTypeDialogOpen = () => {
+    setTypeFormData({
+      name: '',
+    });
+    setTypeDialogOpen(true);
+  };
+
+  const handleTypeDialogClose = () => {
+    setTypeDialogOpen(false);
+  };
+
+  const handleTypeSubmit = async () => {
+    try {
+      if (!typeFormData.name.trim()) {
+        setSnackbar({ open: true, message: 'Please enter a type name', severity: 'error' });
+        return;
+      }
+      await api.post('/product-types', {
+        name: typeFormData.name.trim(),
+      });
+      setSnackbar({ open: true, message: 'Product type created successfully', severity: 'success' });
+      handleTypeDialogClose();
+      fetchProductTypes();
+    } catch (error: any) {
+      setSnackbar({ open: true, message: error.response?.data?.error || 'Error creating product type', severity: 'error' });
+    }
+  };
+
+  const handleBadgeDialogOpen = () => {
+    setBadgeFormData({
+      name: '',
+    });
+    setBadgeDialogOpen(true);
+  };
+
+  const handleBadgeDialogClose = () => {
+    setBadgeDialogOpen(false);
+  };
+
+  const handleBadgeSubmit = async () => {
+    try {
+      if (!badgeFormData.name.trim()) {
+        setSnackbar({ open: true, message: 'Please enter a badge name', severity: 'error' });
+        return;
+      }
+      await api.post('/badges', {
+        name: badgeFormData.name.trim(),
+      });
+      setSnackbar({ open: true, message: 'Badge created successfully', severity: 'success' });
+      handleBadgeDialogClose();
+      fetchBadges();
+    } catch (error: any) {
+      setSnackbar({ open: true, message: error.response?.data?.error || 'Error creating badge', severity: 'error' });
+    }
   };
 
   const handleClose = () => {
@@ -103,14 +221,36 @@ function ProductsContent() {
 
   const handleSubmit = async () => {
     try {
-      if (!formData.imageUrl) {
-        setSnackbar({ open: true, message: 'Please upload an image before saving.', severity: 'error' });
+      // Client-side validation
+      if (!formData.name.trim()) {
+        setSnackbar({ open: true, message: 'Product name is required', severity: 'error' });
         return;
       }
+      if (!formData.slug.trim()) {
+        setSnackbar({ open: true, message: 'Product slug is required', severity: 'error' });
+        return;
+      }
+      if (!formData.description.trim()) {
+        setSnackbar({ open: true, message: 'Product description is required', severity: 'error' });
+        return;
+      }
+      if (!formData.price || isNaN(parseFloat(formData.price))) {
+        setSnackbar({ open: true, message: 'Valid product price is required', severity: 'error' });
+        return;
+      }
+      if (!formData.type) {
+        setSnackbar({ open: true, message: 'Product type is required', severity: 'error' });
+        return;
+      }
+      if (!formData.imageUrl) {
+        setSnackbar({ open: true, message: 'Please upload a product image before saving', severity: 'error' });
+        return;
+      }
+
       const payload = {
         ...formData,
         price: parseFloat(formData.price),
-        badges: formData.badges.split(',').map((b) => b.trim()).filter(Boolean),
+        badges: formData.badges,
         sortOrder: parseInt(formData.sortOrder.toString()),
       };
 
@@ -124,20 +264,69 @@ function ProductsContent() {
       handleClose();
       fetchProducts();
     } catch (error: any) {
-      setSnackbar({ open: true, message: error.response?.data?.error || 'Error saving product', severity: 'error' });
+      // Handle different error response formats
+      let errorMessage = 'Error saving product';
+      
+      if (error.response?.data) {
+        const errorData = error.response.data;
+        
+        // Handle validation errors array
+        if (errorData.errors && Array.isArray(errorData.errors)) {
+          errorMessage = errorData.errors.map((err: any) => err.msg || err.message || err).join(', ');
+        }
+        // Handle single error message
+        else if (errorData.error) {
+          errorMessage = errorData.error;
+        }
+        // Handle error message directly
+        else if (typeof errorData === 'string') {
+          errorMessage = errorData;
+        }
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+
+      setSnackbar({ open: true, message: errorMessage, severity: 'error' });
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (confirm('Are you sure you want to delete this product?')) {
-      try {
-        await api.delete(`/products/${id}`);
-        setSnackbar({ open: true, message: 'Product deleted successfully', severity: 'success' });
-        fetchProducts();
-      } catch (error) {
-        setSnackbar({ open: true, message: 'Error deleting product', severity: 'error' });
+  const handleDeleteClick = (product: Product) => {
+    setProductToDelete(product);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!productToDelete) return;
+    
+    try {
+      await api.delete(`/products/${productToDelete._id}`);
+      setSnackbar({ open: true, message: 'Product deleted successfully', severity: 'success' });
+      setDeleteDialogOpen(false);
+      setProductToDelete(null);
+      fetchProducts();
+    } catch (error: any) {
+      let errorMessage = 'Error deleting product';
+      
+      if (error.response?.data) {
+        const errorData = error.response.data;
+        if (errorData.errors && Array.isArray(errorData.errors)) {
+          errorMessage = errorData.errors.map((err: any) => err.msg || err.message || err).join(', ');
+        } else if (errorData.error) {
+          errorMessage = errorData.error;
+        } else if (typeof errorData === 'string') {
+          errorMessage = errorData;
+        }
+      } else if (error.message) {
+        errorMessage = error.message;
       }
+
+      setSnackbar({ open: true, message: errorMessage, severity: 'error' });
     }
+  };
+
+  const handleDeleteCancel = () => {
+    setDeleteDialogOpen(false);
+    setProductToDelete(null);
   };
 
   const triggerImagePicker = () => {
@@ -172,7 +361,20 @@ function ProductsContent() {
       <Box>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
           <Typography variant="h4">Products</Typography>
-          <Button variant="contained" startIcon={<AddIcon />} onClick={() => handleOpen()}>
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={() => handleOpen()}
+            sx={{
+              bgcolor: 'primary.main',
+              '&:hover': {
+                bgcolor: 'primary.dark',
+                transform: 'translateY(-2px)',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+              },
+              transition: 'all 0.3s ease',
+            }}
+          >
             Add Product
           </Button>
         </Box>
@@ -181,6 +383,7 @@ function ProductsContent() {
           <Table>
             <TableHead>
               <TableRow>
+                <TableCell>Image</TableCell>
                 <TableCell>Name</TableCell>
                 <TableCell>Type</TableCell>
                 <TableCell>Price</TableCell>
@@ -191,6 +394,38 @@ function ProductsContent() {
             <TableBody>
               {products.map((product) => (
                 <TableRow key={product._id}>
+                  <TableCell>
+                    {product.imageUrl ? (
+                      <Box
+                        component="img"
+                        src={product.imageUrl}
+                        alt={product.name}
+                        sx={{
+                          width: 60,
+                          height: 60,
+                          objectFit: 'cover',
+                          borderRadius: 1,
+                          border: '1px solid rgba(0,0,0,0.1)',
+                        }}
+                      />
+                    ) : (
+                      <Box
+                        sx={{
+                          width: 60,
+                          height: 60,
+                          backgroundColor: 'rgba(0,0,0,0.05)',
+                          borderRadius: 1,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: 'text.secondary',
+                          fontSize: '0.75rem',
+                        }}
+                      >
+                        No Image
+                      </Box>
+                    )}
+                  </TableCell>
                   <TableCell>{product.name}</TableCell>
                   <TableCell>{product.type}</TableCell>
                   <TableCell>€{product.price}</TableCell>
@@ -199,7 +434,7 @@ function ProductsContent() {
                     <IconButton size="small" onClick={() => handleOpen(product)}>
                       <EditIcon />
                     </IconButton>
-                    <IconButton size="small" onClick={() => handleDelete(product._id)}>
+                    <IconButton size="small" onClick={() => handleDeleteClick(product)}>
                       <DeleteIcon />
                     </IconButton>
                   </TableCell>
@@ -244,25 +479,30 @@ function ProductsContent() {
                 value={formData.price}
                 onChange={(e) => setFormData({ ...formData, price: e.target.value })}
               />
-              <TextField
-                select
-                label="Type"
-                fullWidth
-                required
-                value={formData.type}
-                onChange={(e) => setFormData({ ...formData, type: e.target.value as any })}
-              >
-                <MenuItem value="starter">Starter</MenuItem>
-                <MenuItem value="bundle">Bundle</MenuItem>
-                <MenuItem value="membership">Membership</MenuItem>
-              </TextField>
-              <TextField
-                label="Image URL"
-                fullWidth
-                value={formData.imageUrl}
-                InputProps={{ readOnly: true }}
-                helperText="Image URL is auto-filled after uploading."
-              />
+              <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start' }}>
+                <TextField
+                  select
+                  label="Type"
+                  fullWidth
+                  required
+                  value={formData.type}
+                  onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+                >
+                  {productTypes.map((type) => (
+                    <MenuItem key={type._id} value={type.slug}>
+                      {type.name}
+                    </MenuItem>
+                  ))}
+                </TextField>
+                <Button
+                  variant="outlined"
+                  startIcon={<AddIcon />}
+                  onClick={handleTypeDialogOpen}
+                  sx={{ mt: 1, whiteSpace: 'nowrap' }}
+                >
+                  Add Type
+                </Button>
+              </Box>
               <Box
                 sx={{
                   display: 'flex',
@@ -296,12 +536,41 @@ function ProductsContent() {
                   onChange={handleImageUpload}
                 />
               </Box>
-              <TextField
-                label="Badges (comma-separated)"
-                fullWidth
-                value={formData.badges}
-                onChange={(e) => setFormData({ ...formData, badges: e.target.value })}
-              />
+              <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start' }}>
+                <FormControl fullWidth>
+                  <InputLabel>Badges</InputLabel>
+                  <Select
+                    multiple
+                    value={formData.badges}
+                    onChange={(e) => setFormData({ ...formData, badges: e.target.value as string[] })}
+                    input={<OutlinedInput label="Badges" />}
+                    renderValue={(selected) => (
+                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                        {selected.map((value) => {
+                          const badge = badges.find((b) => b.slug === value);
+                          return (
+                            <Chip key={value} label={badge?.name || value} size="small" />
+                          );
+                        })}
+                      </Box>
+                    )}
+                  >
+                    {badges.map((badge) => (
+                      <MenuItem key={badge._id} value={badge.slug}>
+                        {badge.name}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+                <Button
+                  variant="outlined"
+                  startIcon={<AddIcon />}
+                  onClick={handleBadgeDialogOpen}
+                  sx={{ mt: 1, whiteSpace: 'nowrap' }}
+                >
+                  Add Badge
+                </Button>
+              </Box>
               <TextField
                 label="Sort Order"
                 type="number"
@@ -324,6 +593,67 @@ function ProductsContent() {
             <Button onClick={handleClose}>Cancel</Button>
             <Button onClick={handleSubmit} variant="contained">
               {editing ? 'Update' : 'Create'}
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        <Dialog open={typeDialogOpen} onClose={handleTypeDialogClose} maxWidth="sm" fullWidth>
+          <DialogTitle>Add Product Type</DialogTitle>
+          <DialogContent>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 2 }}>
+              <TextField
+                label="Type"
+                fullWidth
+                required
+                value={typeFormData.name}
+                onChange={(e) => setTypeFormData({ name: e.target.value })}
+                placeholder="e.g., Starter, Bundle, Membership"
+                autoFocus
+              />
+            </Box>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={handleTypeDialogClose}>Cancel</Button>
+            <Button onClick={handleTypeSubmit} variant="contained">
+              Create Type
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        <Dialog open={badgeDialogOpen} onClose={handleBadgeDialogClose} maxWidth="sm" fullWidth>
+          <DialogTitle>Add Badge</DialogTitle>
+          <DialogContent>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 2 }}>
+              <TextField
+                label="Badge"
+                fullWidth
+                required
+                value={badgeFormData.name}
+                onChange={(e) => setBadgeFormData({ name: e.target.value })}
+                placeholder="e.g., New, Best Seller, Featured"
+                autoFocus
+              />
+            </Box>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={handleBadgeDialogClose}>Cancel</Button>
+            <Button onClick={handleBadgeSubmit} variant="contained">
+              Create Badge
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        <Dialog open={deleteDialogOpen} onClose={handleDeleteCancel} maxWidth="sm" fullWidth>
+          <DialogTitle>Delete Product</DialogTitle>
+        <DialogContent>
+          <Typography>
+            Are you sure you want to delete &ldquo;{productToDelete?.name}&rdquo;? This action cannot be undone.
+          </Typography>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={handleDeleteCancel}>Cancel</Button>
+            <Button onClick={handleDeleteConfirm} variant="contained" color="error">
+              Delete
             </Button>
           </DialogActions>
         </Dialog>
