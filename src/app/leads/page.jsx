@@ -20,7 +20,48 @@ import {
   Snackbar,
   Alert,
 } from '@mui/material';
-import api from '@/lib/api';
+import axios from 'axios';
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
+if (!API_BASE_URL) {
+  throw new Error('NEXT_PUBLIC_API_URL environment variable is missing!');
+}
+const API_URL = `${API_BASE_URL}/api`;
+console.log('🔗 Admin Leads API URL:', API_URL);
+
+function getApiInstance() {
+  const instance = axios.create({
+    baseURL: API_URL,
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  });
+  
+  instance.interceptors.request.use((config) => {
+    const token = localStorage.getItem('admin_token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    console.log(`📡 ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`);
+    return config;
+  });
+  
+  instance.interceptors.response.use(
+    (response) => response,
+    (error) => {
+      console.error('❌ API Error:', {
+        url: error.config?.url,
+        method: error.config?.method,
+        status: error.response?.status,
+        message: error.response?.data?.error || error.message,
+        fullUrl: `${error.config?.baseURL}${error.config?.url}`,
+      });
+      return Promise.reject(error);
+    }
+  );
+  
+  return instance;
+}
 
 function TabPanel(props) {
   const { children, value, index, ...other } = props;
@@ -44,6 +85,7 @@ function LeadsContent() {
 
   const fetchLeads = async () => {
     try {
+      const api = getApiInstance();
       const [b2b, edu, contact] = await Promise.all([
         api.get('/leads/b2b').then((res) => res.data),
         api.get('/leads/education').then((res) => res.data),
@@ -60,10 +102,13 @@ function LeadsContent() {
   const handleStatusChange = async (type, id, status) => {
     try {
       if (type === 'b2b') {
+        const api = getApiInstance();
         await api.put(`/leads/b2b/${id}`, { status });
       } else if (type === 'education') {
+        const api = getApiInstance();
         await api.put(`/leads/education/${id}`, { status });
       } else {
+        const api = getApiInstance();
         await api.put(`/contact/${id}`, { status });
       }
       setSnackbar({ open: true, message: 'Status updated successfully', severity: 'success' });

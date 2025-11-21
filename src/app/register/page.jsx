@@ -13,7 +13,14 @@ import {
   CardContent,
   Alert,
 } from '@mui/material';
-import api from '@/lib/api';
+import axios from 'axios';
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
+if (!API_BASE_URL) {
+  throw new Error('NEXT_PUBLIC_API_URL environment variable is missing!');
+}
+const API_URL = `${API_BASE_URL}/api`;
+console.log('🔗 Admin Register API URL:', API_URL);
 
 export default function AdminRegister() {
   const router = useRouter();
@@ -45,7 +52,8 @@ export default function AdminRegister() {
     setLoading(true);
 
     try {
-      const res = await api.post('/auth/register-admin', {
+      console.log(`📡 POST ${API_URL}/auth/register-admin`);
+      const res = await axios.post(`${API_URL}/auth/register-admin`, {
         email: formData.email,
         password: formData.password,
         name: formData.name,

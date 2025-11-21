@@ -13,7 +13,14 @@ import {
   CardContent,
   Alert,
 } from '@mui/material';
-import api from '@/lib/api';
+import axios from 'axios';
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
+if (!API_BASE_URL) {
+  throw new Error('NEXT_PUBLIC_API_URL environment variable is missing!');
+}
+const API_URL = `${API_BASE_URL}/api`;
+console.log('🔗 Admin Login API URL:', API_URL);
 
 export default function AdminLogin() {
   const router = useRouter();
@@ -34,11 +41,18 @@ export default function AdminLogin() {
     setLoading(true);
 
     try {
-      const res = await api.post('/auth/login', formData);
+      const url = `${API_URL}/auth/login`;
+      console.log(`📡 POST ${url}`);
+      const res = await axios.post(url, formData);
       localStorage.setItem('admin_token', res.data.token);
       localStorage.setItem('admin_user', JSON.stringify(res.data.user));
       router.push('/');
     } catch (err) {
+      console.error('❌ Login error:', {
+        url: `${API_URL}/auth/login`,
+        error: err.response?.data || err.message,
+        status: err.response?.status,
+      });
       setError(err.response?.data?.error || 'Login failed. Please try again.');
     } finally {
       setLoading(false);

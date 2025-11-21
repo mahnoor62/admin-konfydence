@@ -28,7 +28,48 @@ import {
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
-import api from '@/lib/api';
+import axios from 'axios';
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
+if (!API_BASE_URL) {
+  throw new Error('NEXT_PUBLIC_API_URL environment variable is missing!');
+}
+const API_URL = `${API_BASE_URL}/api`;
+console.log('🔗 Admin Partners API URL:', API_URL);
+
+function getApiInstance() {
+  const instance = axios.create({
+    baseURL: API_URL,
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  });
+  
+  instance.interceptors.request.use((config) => {
+    const token = localStorage.getItem('admin_token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    console.log(`📡 ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`);
+    return config;
+  });
+  
+  instance.interceptors.response.use(
+    (response) => response,
+    (error) => {
+      console.error('❌ API Error:', {
+        url: error.config?.url,
+        method: error.config?.method,
+        status: error.response?.status,
+        message: error.response?.data?.error || error.message,
+        fullUrl: `${error.config?.baseURL}${error.config?.url}`,
+      });
+      return Promise.reject(error);
+    }
+  );
+  
+  return instance;
+}
 
 function PartnersContent() {
   const [partners, setPartners] = useState([]);
@@ -51,6 +92,7 @@ function PartnersContent() {
 
   const fetchPartners = async () => {
     try {
+      const api = getApiInstance();
       const res = await api.get('/partners');
       setPartners(res.data);
     } catch (error) {
@@ -103,9 +145,11 @@ function PartnersContent() {
       }
 
       if (editing) {
+        const api = getApiInstance();
         await api.put(`/partners/${editing._id}`, formData);
         setSnackbar({ open: true, message: 'Partner logo updated successfully', severity: 'success' });
       } else {
+        const api = getApiInstance();
         await api.post('/partners', formData);
         setSnackbar({ open: true, message: 'Partner logo created successfully', severity: 'success' });
       }
@@ -140,6 +184,7 @@ function PartnersContent() {
     if (!partnerToDelete) return;
     
     try {
+      const api = getApiInstance();
       await api.delete(`/partners/${partnerToDelete._id}`);
       setSnackbar({ open: true, message: 'Partner logo deleted successfully', severity: 'success' });
       setDeleteDialogOpen(false);

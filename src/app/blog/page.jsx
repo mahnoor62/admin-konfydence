@@ -33,7 +33,48 @@ import {
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
-import api from '@/lib/api';
+import axios from 'axios';
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
+if (!API_BASE_URL) {
+  throw new Error('NEXT_PUBLIC_API_URL environment variable is missing!');
+}
+const API_URL = `${API_BASE_URL}/api`;
+console.log('🔗 Admin Blog API URL:', API_URL);
+
+function getApiInstance() {
+  const instance = axios.create({
+    baseURL: API_URL,
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  });
+  
+  instance.interceptors.request.use((config) => {
+    const token = localStorage.getItem('admin_token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    console.log(`📡 ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`);
+    return config;
+  });
+  
+  instance.interceptors.response.use(
+    (response) => response,
+    (error) => {
+      console.error('❌ API Error:', {
+        url: error.config?.url,
+        method: error.config?.method,
+        status: error.response?.status,
+        message: error.response?.data?.error || error.message,
+        fullUrl: `${error.config?.baseURL}${error.config?.url}`,
+      });
+      return Promise.reject(error);
+    }
+  );
+  
+  return instance;
+}
 
 function BlogContent() {
   const [posts, setPosts] = useState([]);
@@ -63,6 +104,7 @@ function BlogContent() {
 
   const fetchPosts = useCallback(async () => {
     try {
+      const api = getApiInstance();
       const res = await api.get('/blog', {
         params: { all: true },
       });
@@ -100,6 +142,7 @@ function BlogContent() {
 
   const fetchTags = useCallback(async () => {
     try {
+      const api = getApiInstance();
       const res = await api.get('/blog-tags', {
         params: { active: 'true' },
       });
@@ -186,9 +229,11 @@ function BlogContent() {
       };
 
       if (editing) {
+        const api = getApiInstance();
         await api.put(`/blog/${editing._id}`, payload);
         setSnackbar({ open: true, message: 'Post updated successfully', severity: 'success' });
       } else {
+        const api = getApiInstance();
         await api.post('/blog', payload);
         setSnackbar({ open: true, message: 'Post created successfully', severity: 'success' });
       }
@@ -223,6 +268,7 @@ function BlogContent() {
     if (!postToDelete) return;
     
     try {
+      const api = getApiInstance();
       const response = await api.delete(`/blog/${postToDelete._id}`);
       setSnackbar({ open: true, message: 'Post deleted successfully', severity: 'success' });
       setDeleteDialogOpen(false);
@@ -270,6 +316,7 @@ function BlogContent() {
         setSnackbar({ open: true, message: 'Please enter a category name', severity: 'error' });
         return;
       }
+      const api = getApiInstance();
       await api.post('/blog-categories', {
         name: categoryFormData.name.trim(),
       });
@@ -296,6 +343,7 @@ function BlogContent() {
         setSnackbar({ open: true, message: 'Please enter a tag name', severity: 'error' });
         return;
       }
+      const api = getApiInstance();
       await api.post('/blog-tags', {
         name: tagFormData.name.trim(),
       });
@@ -318,6 +366,7 @@ function BlogContent() {
     form.append('file', file);
     try {
       setUploadingImage(true);
+      const api = getApiInstance();
       const res = await api.post('/uploads', form, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });

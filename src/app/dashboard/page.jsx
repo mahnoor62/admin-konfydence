@@ -2,7 +2,14 @@
 
 import { useState, useEffect } from 'react';
 import { Grid, Card, CardContent, Typography, Box } from '@mui/material';
-import api from '@/lib/api';
+import axios from 'axios';
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
+if (!API_BASE_URL) {
+  throw new Error('NEXT_PUBLIC_API_URL environment variable is missing!');
+}
+const API_URL = `${API_BASE_URL}/api`;
+console.log('🔗 Admin Dashboard API URL:', API_URL);
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState({
@@ -20,12 +27,12 @@ export default function AdminDashboard() {
         // Fetch all items with proper parameters to get complete counts
         // Use includeInactive=true for products to get all products (active + inactive) for accurate dashboard counts
         const [productsRes, blogRes, testimonialsRes, b2bLeadsRes, eduLeadsRes, contactRes] = await Promise.all([
-          api.get('/products', { params: { all: true, includeInactive: true } }),
-          api.get('/blog', { params: { all: true } }),
-          api.get('/testimonials'),
-          api.get('/leads/b2b'),
-          api.get('/leads/education'),
-          api.get('/contact'),
+          axios.get(`${API_URL}/products`, { params: { all: true, includeInactive: true } }),
+          axios.get(`${API_URL}/blog`, { params: { all: true } }),
+          axios.get(`${API_URL}/testimonials`),
+          axios.get(`${API_URL}/leads/b2b`),
+          axios.get(`${API_URL}/leads/education`),
+          axios.get(`${API_URL}/contact`),
         ]);
 
         // Handle different response formats
@@ -62,7 +69,11 @@ export default function AdminDashboard() {
           contactMessages,
         });
       } catch (error) {
-        console.error('Error fetching stats:', error);
+        console.error('❌ Error fetching dashboard stats:', {
+          url: API_URL,
+          error: error.response?.data || error.message,
+          status: error.response?.status,
+        });
         // Set error state or show notification
       }
     }

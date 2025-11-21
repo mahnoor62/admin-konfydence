@@ -28,8 +28,50 @@ import {
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
-import api from '@/lib/api';
+import axios from 'axios';
 import { Select, FormControl, InputLabel, OutlinedInput, Chip } from '@mui/material';
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
+if (!API_BASE_URL) {
+  throw new Error('NEXT_PUBLIC_API_URL environment variable is missing!');
+}
+const API_URL = `${API_BASE_URL}/api`;
+console.log('🔗 Admin Products API URL:', API_URL);
+
+// Helper to get axios instance with auth token
+function getApiInstance() {
+  const instance = axios.create({
+    baseURL: API_URL,
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  });
+  
+  instance.interceptors.request.use((config) => {
+    const token = localStorage.getItem('admin_token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    console.log(`📡 ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`);
+    return config;
+  });
+  
+  instance.interceptors.response.use(
+    (response) => response,
+    (error) => {
+      console.error('❌ API Error:', {
+        url: error.config?.url,
+        method: error.config?.method,
+        status: error.response?.status,
+        message: error.response?.data?.error || error.message,
+        fullUrl: `${error.config?.baseURL}${error.config?.url}`,
+      });
+      return Promise.reject(error);
+    }
+  );
+  
+  return instance;
+}
 
 function ProductsContent() {
   const [products, setProducts] = useState([]);
@@ -64,17 +106,19 @@ function ProductsContent() {
 
   const fetchProducts = useCallback(async () => {
     try {
+      const api = getApiInstance();
       const res = await api.get('/products', {
         params: { includeInactive: true, all: true },
       });
       setProducts(res.data);
     } catch (error) {
-      console.error('Error fetching products:', error);
+      console.error('❌ Error fetching products:', error.response?.data || error.message);
     }
   }, []);
 
   const fetchProductTypes = useCallback(async () => {
     try {
+      const api = getApiInstance();
       const res = await api.get('/product-types', {
         params: { active: 'true' },
       });
@@ -88,12 +132,13 @@ function ProductsContent() {
         });
       }
     } catch (error) {
-      console.error('Error fetching product types:', error);
+      console.error('❌ Error fetching product types:', error.response?.data || error.message);
     }
   }, []);
 
   const fetchBadges = useCallback(async () => {
     try {
+      const api = getApiInstance();
       const res = await api.get('/badges', {
         params: { active: 'true' },
       });
@@ -157,6 +202,7 @@ function ProductsContent() {
         setSnackbar({ open: true, message: 'Please enter a type name', severity: 'error' });
         return;
       }
+      const api = getApiInstance();
       await api.post('/product-types', {
         name: typeFormData.name.trim(),
       });
@@ -185,6 +231,7 @@ function ProductsContent() {
         setSnackbar({ open: true, message: 'Please enter a badge name', severity: 'error' });
         return;
       }
+      const api = getApiInstance();
       await api.post('/badges', {
         name: badgeFormData.name.trim(),
       });
@@ -236,6 +283,7 @@ function ProductsContent() {
         sortOrder: parseInt(formData.sortOrder.toString()),
       };
 
+      const api = getApiInstance();
       if (editing) {
         await api.put(`/products/${editing._id}`, payload);
         setSnackbar({ open: true, message: 'Product updated successfully', severity: 'success' });
@@ -281,6 +329,7 @@ function ProductsContent() {
     if (!productToDelete) return;
     
     try {
+      const api = getApiInstance();
       await api.delete(`/products/${productToDelete._id}`);
       setSnackbar({ open: true, message: 'Product deleted successfully', severity: 'success' });
       setDeleteDialogOpen(false);
@@ -322,6 +371,7 @@ function ProductsContent() {
     form.append('file', file);
     try {
       setUploadingImage(true);
+      const api = getApiInstance();
       const res = await api.post('/uploads', form, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });

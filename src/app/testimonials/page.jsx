@@ -28,7 +28,48 @@ import {
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
-import api from '@/lib/api';
+import axios from 'axios';
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
+if (!API_BASE_URL) {
+  throw new Error('NEXT_PUBLIC_API_URL environment variable is missing!');
+}
+const API_URL = `${API_BASE_URL}/api`;
+console.log('🔗 Admin Testimonials API URL:', API_URL);
+
+function getApiInstance() {
+  const instance = axios.create({
+    baseURL: API_URL,
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  });
+  
+  instance.interceptors.request.use((config) => {
+    const token = localStorage.getItem('admin_token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    console.log(`📡 ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`);
+    return config;
+  });
+  
+  instance.interceptors.response.use(
+    (response) => response,
+    (error) => {
+      console.error('❌ API Error:', {
+        url: error.config?.url,
+        method: error.config?.method,
+        status: error.response?.status,
+        message: error.response?.data?.error || error.message,
+        fullUrl: `${error.config?.baseURL}${error.config?.url}`,
+      });
+      return Promise.reject(error);
+    }
+  );
+  
+  return instance;
+}
 
 function TestimonialsContent() {
   const [testimonials, setTestimonials] = useState([]);
@@ -50,6 +91,7 @@ function TestimonialsContent() {
 
   const fetchTestimonials = async () => {
     try {
+      const api = getApiInstance();
       const res = await api.get('/testimonials');
       setTestimonials(res.data);
     } catch (error) {
@@ -90,9 +132,11 @@ function TestimonialsContent() {
   const handleSubmit = async () => {
     try {
       if (editing) {
+        const api = getApiInstance();
         await api.put(`/testimonials/${editing._id}`, formData);
         setSnackbar({ open: true, message: 'Testimonial updated successfully', severity: 'success' });
       } else {
+        const api = getApiInstance();
         await api.post('/testimonials', formData);
         setSnackbar({ open: true, message: 'Testimonial created successfully', severity: 'success' });
       }
@@ -106,6 +150,7 @@ function TestimonialsContent() {
   const handleDelete = async (id) => {
     if (confirm('Are you sure you want to delete this testimonial?')) {
       try {
+        const api = getApiInstance();
         await api.delete(`/testimonials/${id}`);
         setSnackbar({ open: true, message: 'Testimonial deleted successfully', severity: 'success' });
         fetchTestimonials();

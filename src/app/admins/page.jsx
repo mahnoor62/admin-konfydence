@@ -27,7 +27,48 @@ import {
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
-import api from '@/lib/api';
+import axios from 'axios';
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
+if (!API_BASE_URL) {
+  throw new Error('NEXT_PUBLIC_API_URL environment variable is missing!');
+}
+const API_URL = `${API_BASE_URL}/api`;
+console.log('🔗 Admin Admins API URL:', API_URL);
+
+function getApiInstance() {
+  const instance = axios.create({
+    baseURL: API_URL,
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  });
+  
+  instance.interceptors.request.use((config) => {
+    const token = localStorage.getItem('admin_token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    console.log(`📡 ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`);
+    return config;
+  });
+  
+  instance.interceptors.response.use(
+    (response) => response,
+    (error) => {
+      console.error('❌ API Error:', {
+        url: error.config?.url,
+        method: error.config?.method,
+        status: error.response?.status,
+        message: error.response?.data?.error || error.message,
+        fullUrl: `${error.config?.baseURL}${error.config?.url}`,
+      });
+      return Promise.reject(error);
+    }
+  );
+  
+  return instance;
+}
 
 function AdminsContent() {
   const [admins, setAdmins] = useState([]);
@@ -45,6 +86,7 @@ function AdminsContent() {
 
   const fetchAdmins = async () => {
     try {
+      const api = getApiInstance();
       const res = await api.get('/auth/admins');
       setAdmins(res.data);
     } catch (error) {
@@ -72,6 +114,7 @@ function AdminsContent() {
     if (!editing) return;
 
     try {
+      const api = getApiInstance();
       await api.put(`/auth/admins/${editing._id}`, formData);
       setSnackbar({ open: true, message: 'Admin updated successfully', severity: 'success' });
       handleClose();
@@ -84,6 +127,7 @@ function AdminsContent() {
   const handleDelete = async (id) => {
     if (confirm('Are you sure you want to delete this admin?')) {
       try {
+        const api = getApiInstance();
         await api.delete(`/auth/admins/${id}`);
         setSnackbar({ open: true, message: 'Admin deleted successfully', severity: 'success' });
         fetchAdmins();
