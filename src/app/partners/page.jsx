@@ -201,7 +201,7 @@ function PartnersContent() {
               <TableRow>
                 <TableCell colSpan={5} align="center" sx={{ py: 4 }}>
                   <Typography variant="body2" color="text.secondary">
-                    No partner logos found. Click "Add Partner Logo" to create your first partner logo.
+                    No partner logos found. Click &ldquo;Add Partner Logo&rdquo; to create your first partner logo.
                   </Typography>
                 </TableCell>
               </TableRow>

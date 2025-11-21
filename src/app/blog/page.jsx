@@ -318,7 +318,7 @@ function BlogContent() {
     form.append('file', file);
     try {
       setUploadingImage(true);
-      const res = await api.post<{ url: string }>('/uploads', form, {
+      const res = await api.post('/uploads', form, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
       setFormData((prev) => ({ ...prev, featuredImage: res.data.url }));
@@ -373,7 +373,7 @@ function BlogContent() {
               <TableRow>
                 <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
                   <Typography variant="body2" color="text.secondary">
-                    No blog posts found. Click "Add Post" to create your first blog post.
+                    No blog posts found. Click &ldquo;Add Post&rdquo; to create your first blog post.
                   </Typography>
                 </TableCell>
               </TableRow>

@@ -154,7 +154,7 @@ function TestimonialsContent() {
               <TableRow>
                 <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
                   <Typography variant="body2" color="text.secondary">
-                    No testimonials found. Click "Add Testimonial" to create your first testimonial.
+                    No testimonials found. Click &ldquo;Add Testimonial&rdquo; to create your first testimonial.
                   </Typography>
                 </TableCell>
               </TableRow>
@@ -221,7 +221,7 @@ function TestimonialsContent() {
               fullWidth
               required
               value={formData.segment}
-              onChange={(e) => setFormData({ ...formData, segment: e.target.value as any })}
+              onChange={(e) => setFormData({ ...formData, segment: e.target.value })}
             >
               <MenuItem value="b2b">B2B</MenuItem>
               <MenuItem value="b2c">B2C</MenuItem>

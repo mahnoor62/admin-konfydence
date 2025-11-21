@@ -378,7 +378,7 @@ function ProductsContent() {
                 <TableRow>
                   <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
                     <Typography variant="body2" color="text.secondary">
-                      No products found. Click "Add Product" to create your first product.
+                      No products found. Click &ldquo;Add Product&rdquo; to create your first product.
                     </Typography>
                   </TableCell>
                 </TableRow>
