@@ -11,6 +11,46 @@ if (!API_BASE_URL) {
 const API_URL = `${API_BASE_URL}/api`;
 console.log('🔗 Admin Dashboard API URL:', API_URL);
 
+// Helper to get axios instance with auth token
+function getApiInstance() {
+  const instance = axios.create({
+    baseURL: API_URL,
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  });
+  
+  instance.interceptors.request.use((config) => {
+    const token = localStorage.getItem('admin_token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    // Prevent caching for GET requests
+    if (config.method === 'get') {
+      config.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate';
+      config.headers['Pragma'] = 'no-cache';
+      config.headers['Expires'] = '0';
+    }
+    return config;
+  });
+  
+  instance.interceptors.response.use(
+    (response) => response,
+    (error) => {
+      console.error('❌ API Error:', {
+        url: error.config?.url,
+        method: error.config?.method,
+        status: error.response?.status,
+        message: error.response?.data?.error || error.message,
+        fullUrl: `${error.config?.baseURL}${error.config?.url}`,
+      });
+      return Promise.reject(error);
+    }
+  );
+  
+  return instance;
+}
+
 export default function AdminDashboard() {
   const [stats, setStats] = useState({
     products: 0,
@@ -24,15 +64,16 @@ export default function AdminDashboard() {
   useEffect(() => {
     async function fetchStats() {
       try {
+        const api = getApiInstance();
         // Fetch all items with proper parameters to get complete counts
         // Use includeInactive=true for products to get all products (active + inactive) for accurate dashboard counts
         const [productsRes, blogRes, testimonialsRes, b2bLeadsRes, eduLeadsRes, contactRes] = await Promise.all([
-          axios.get(`${API_URL}/products`, { params: { all: true, includeInactive: true } }),
-          axios.get(`${API_URL}/blog`, { params: { all: true } }),
-          axios.get(`${API_URL}/testimonials`),
-          axios.get(`${API_URL}/leads/b2b`),
-          axios.get(`${API_URL}/leads/education`),
-          axios.get(`${API_URL}/contact`),
+          api.get('/products', { params: { all: true, includeInactive: true } }),
+          api.get('/blog', { params: { all: true } }),
+          api.get('/testimonials'),
+          api.get('/leads/b2b'),
+          api.get('/leads/education'),
+          api.get('/contact'),
         ]);
 
         // Handle different response formats
