@@ -55,6 +55,12 @@ function getApiInstance() {
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    // Prevent caching for GET requests
+    if (config.method === 'get') {
+      config.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate';
+      config.headers['Pragma'] = 'no-cache';
+      config.headers['Expires'] = '0';
+    }
     console.log(`📡 ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`);
     return config;
   });
@@ -125,7 +131,7 @@ function BlogContent() {
     try {
       const api = getApiInstance();
       const res = await api.get('/blog-categories', {
-        params: { active: 'true' },
+        params: { active: 'true', _t: Date.now() },
       });
       setCategories(res.data);
       if (res.data.length > 0) {
@@ -145,7 +151,7 @@ function BlogContent() {
     try {
       const api = getApiInstance();
       const res = await api.get('/blog-tags', {
-        params: { active: 'true' },
+        params: { active: 'true', _t: Date.now() },
       });
       setTags(res.data);
     } catch (error) {

@@ -52,6 +52,12 @@ function getApiInstance() {
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    // Prevent caching for GET requests
+    if (config.method === 'get') {
+      config.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate';
+      config.headers['Pragma'] = 'no-cache';
+      config.headers['Expires'] = '0';
+    }
     console.log(`📡 ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`);
     return config;
   });
@@ -120,7 +126,7 @@ function ProductsContent() {
     try {
       const api = getApiInstance();
       const res = await api.get('/product-types', {
-        params: { active: 'true' },
+        params: { active: 'true', _t: Date.now() },
       });
       setProductTypes(res.data);
       if (res.data.length > 0) {
@@ -140,7 +146,7 @@ function ProductsContent() {
     try {
       const api = getApiInstance();
       const res = await api.get('/badges', {
-        params: { active: 'true' },
+        params: { active: 'true', _t: Date.now() },
       });
       setBadges(res.data);
     } catch (error) {
