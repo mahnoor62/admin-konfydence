@@ -123,6 +123,7 @@ function BlogContent() {
 
   const fetchCategories = useCallback(async () => {
     try {
+      const api = getApiInstance();
       const res = await api.get('/blog-categories', {
         params: { active: 'true' },
       });
