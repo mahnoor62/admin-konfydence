@@ -834,20 +834,21 @@ function ProductsContent() {
   const fetchProducts = async () => {
     try {
       const headers = getAuthHeaders();
-      const res = await axios.get(`${API_URL}/products`, {
-        headers,
-        params: { includeInactive: true, all: true },
-      });
+      const url = `${API_URL}/products`;
+      const params = { includeInactive: true, all: true };
+      console.log('📡 API: GET', url, params);
+      const res = await axios.get(url, { headers, params });
       const productsData = Array.isArray(res.data)
         ? res.data
         : res.data.products || [];
-      console.log('📦 Products fetched in product page:', productsData);
+      console.log('📦 Products fetched:', productsData.length, 'items');
       setProducts(productsData);
     } catch (error) {
-      console.error(
-        '❌ Error fetching products:',
-        error.response?.data || error.message
-      );
+      console.error('❌ Error fetching products:', {
+        url: `${API_URL}/products`,
+        error: error.response?.data || error.message,
+        status: error.response?.status,
+      });
       setProducts([]);
     }
   };
@@ -855,10 +856,10 @@ function ProductsContent() {
   const fetchProductTypes = async () => {
     try {
       const headers = getAuthHeaders();
-      const res = await axios.get(`${API_URL}/product-types`, {
-        headers,
-        params: { active: 'true', _t: Date.now() },
-      });
+      const url = `${API_URL}/product-types`;
+      const params = { active: 'true', _t: Date.now() };
+      console.log('📡 API: GET', url, params);
+      const res = await axios.get(url, { headers, params });
       const typesData = Array.isArray(res.data) ? res.data : [];
       setProductTypes(typesData);
 
@@ -869,10 +870,11 @@ function ProductsContent() {
         });
       }
     } catch (error) {
-      console.error(
-        '❌ Error fetching product types:',
-        error.response?.data || error.message
-      );
+      console.error('❌ Error fetching product types:', {
+        url: `${API_URL}/product-types`,
+        error: error.response?.data || error.message,
+        status: error.response?.status,
+      });
       setProductTypes([]);
     }
   };
@@ -880,14 +882,18 @@ function ProductsContent() {
   const fetchBadges = async () => {
     try {
       const headers = getAuthHeaders();
-      const res = await axios.get(`${API_URL}/badges`, {
-        headers,
-        params: { active: 'true', _t: Date.now() },
-      });
+      const url = `${API_URL}/badges`;
+      const params = { active: 'true', _t: Date.now() };
+      console.log('📡 API: GET', url, params);
+      const res = await axios.get(url, { headers, params });
       const badgesData = Array.isArray(res.data) ? res.data : [];
       setBadges(badgesData);
     } catch (error) {
-      console.error('Error fetching badges:', error);
+      console.error('❌ Error fetching badges:', {
+        url: `${API_URL}/badges`,
+        error: error.response?.data || error.message,
+        status: error.response?.status,
+      });
       setBadges([]);
     }
   };
@@ -953,11 +959,10 @@ function ProductsContent() {
         return;
       }
       const headers = getAuthHeaders();
-      await axios.post(
-        `${API_URL}/product-types`,
-        { name: typeFormData.name.trim() },
-        { headers }
-      );
+      const url = `${API_URL}/product-types`;
+      const payload = { name: typeFormData.name.trim() };
+      console.log('📡 API: POST', url, payload);
+      await axios.post(url, payload, { headers });
       setSnackbar({
         open: true,
         message: 'Product type created successfully',
@@ -995,11 +1000,10 @@ function ProductsContent() {
         return;
       }
       const headers = getAuthHeaders();
-      await axios.post(
-        `${API_URL}/badges`,
-        { name: badgeFormData.name.trim() },
-        { headers }
-      );
+      const url = `${API_URL}/badges`;
+      const payload = { name: badgeFormData.name.trim() };
+      console.log('📡 API: POST', url, payload);
+      await axios.post(url, payload, { headers });
       setSnackbar({
         open: true,
         message: 'Badge created successfully',
@@ -1083,18 +1087,18 @@ function ProductsContent() {
 
       const headers = getAuthHeaders();
       if (editing) {
-        await axios.put(
-          `${API_URL}/products/${editing._id}`,
-          payload,
-          { headers }
-        );
+        const url = `${API_URL}/products/${editing._id}`;
+        console.log('📡 API: PUT', url, payload);
+        await axios.put(url, payload, { headers });
         setSnackbar({
           open: true,
           message: 'Product updated successfully',
           severity: 'success',
         });
       } else {
-        await axios.post(`${API_URL}/products`, payload, { headers });
+        const url = `${API_URL}/products`;
+        console.log('📡 API: POST', url, payload);
+        await axios.post(url, payload, { headers });
         setSnackbar({
           open: true,
           message: 'Product created successfully',
@@ -1136,10 +1140,9 @@ function ProductsContent() {
 
     try {
       const headers = getAuthHeaders();
-      await axios.delete(
-        `${API_URL}/products/${productToDelete._id}`,
-        { headers }
-      );
+      const url = `${API_URL}/products/${productToDelete._id}`;
+      console.log('📡 API: DELETE', url);
+      await axios.delete(url, { headers });
       setSnackbar({
         open: true,
         message: 'Product deleted successfully',
@@ -1193,7 +1196,9 @@ function ProductsContent() {
       const headers = getAuthHeaders({
         'Content-Type': 'multipart/form-data',
       });
-      const res = await axios.post(`${API_URL}/uploads`, form, { headers });
+      const url = `${API_URL}/uploads`;
+      console.log('📡 API: POST', url, '[FormData]');
+      const res = await axios.post(url, form, { headers });
       setFormData((prev) => ({ ...prev, imageUrl: res.data.url }));
       setSnackbar({
         open: true,

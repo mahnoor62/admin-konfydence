@@ -36,38 +36,16 @@ if (!API_BASE_URL) {
 const API_URL = `${API_BASE_URL}/api`;
 console.log('🔗 Admin Admins API URL:', API_URL);
 
-function getApiInstance() {
-  const instance = axios.create({
-    baseURL: API_URL,
-    headers: {
-      'Content-Type': 'application/json',
-    },
-  });
-  
-  instance.interceptors.request.use((config) => {
-    const token = localStorage.getItem('admin_token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    console.log(`📡 ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`);
-    return config;
-  });
-  
-  instance.interceptors.response.use(
-    (response) => response,
-    (error) => {
-      console.error('❌ API Error:', {
-        url: error.config?.url,
-        method: error.config?.method,
-        status: error.response?.status,
-        message: error.response?.data?.error || error.message,
-        fullUrl: `${error.config?.baseURL}${error.config?.url}`,
-      });
-      return Promise.reject(error);
-    }
-  );
-  
-  return instance;
+function getAuthHeaders() {
+  if (typeof window === 'undefined') {
+    return {};
+  }
+  const token = localStorage.getItem('admin_token');
+  const headers = { 'Content-Type': 'application/json' };
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+  return headers;
 }
 
 function AdminsContent() {
@@ -86,11 +64,19 @@ function AdminsContent() {
 
   const fetchAdmins = async () => {
     try {
-      const api = getApiInstance();
-      const res = await api.get('/auth/admins');
-      setAdmins(res.data);
+      const headers = getAuthHeaders();
+      const url = `${API_URL}/auth/admins`;
+      console.log('📡 API: GET', url);
+      const res = await axios.get(url, { headers });
+      const data = Array.isArray(res.data) ? res.data : [];
+      setAdmins(data);
     } catch (error) {
-      console.error('Error fetching admins:', error);
+      console.error('❌ Error fetching admins:', {
+        url: `${API_URL}/auth/admins`,
+        error: error.response?.data || error.message,
+        status: error.response?.status,
+      });
+      setAdmins([]);
     }
   };
 
@@ -114,12 +100,19 @@ function AdminsContent() {
     if (!editing) return;
 
     try {
-      const api = getApiInstance();
-      await api.put(`/auth/admins/${editing._id}`, formData);
+      const headers = getAuthHeaders();
+      const url = `${API_URL}/auth/admins/${editing._id}`;
+      console.log('📡 API: PUT', url, formData);
+      await axios.put(url, formData, { headers });
       setSnackbar({ open: true, message: 'Admin updated successfully', severity: 'success' });
       handleClose();
       fetchAdmins();
     } catch (error) {
+      console.error('❌ Error updating admin:', {
+        url: `${API_URL}/auth/admins/${editing._id}`,
+        error: error.response?.data || error.message,
+        status: error.response?.status,
+      });
       setSnackbar({ open: true, message: error.response?.data?.error || 'Error updating admin', severity: 'error' });
     }
   };
@@ -127,11 +120,18 @@ function AdminsContent() {
   const handleDelete = async (id) => {
     if (confirm('Are you sure you want to delete this admin?')) {
       try {
-        const api = getApiInstance();
-        await api.delete(`/auth/admins/${id}`);
+        const headers = getAuthHeaders();
+        const url = `${API_URL}/auth/admins/${id}`;
+        console.log('📡 API: DELETE', url);
+        await axios.delete(url, { headers });
         setSnackbar({ open: true, message: 'Admin deleted successfully', severity: 'success' });
         fetchAdmins();
       } catch (error) {
+        console.error('❌ Error deleting admin:', {
+          url: `${API_URL}/auth/admins/${id}`,
+          error: error.response?.data || error.message,
+          status: error.response?.status,
+        });
         setSnackbar({ open: true, message: error.response?.data?.error || 'Error deleting admin', severity: 'error' });
       }
     }

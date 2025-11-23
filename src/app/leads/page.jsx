@@ -368,6 +368,10 @@ function LeadsContent() {
     try {
       const headers = getAuthHeaders();
 
+      console.log('📡 API: GET', `${API_URL}/leads/b2b`);
+      console.log('📡 API: GET', `${API_URL}/leads/education`);
+      console.log('📡 API: GET', `${API_URL}/contact`);
+
       const [b2b, edu, contact] = await Promise.all([
         axios.get(`${API_URL}/leads/b2b`, { headers }),
         axios.get(`${API_URL}/leads/education`, { headers }),
@@ -378,21 +382,29 @@ function LeadsContent() {
       setEduLeads(Array.isArray(edu.data) ? edu.data : []);
       setContactMessages(Array.isArray(contact.data) ? contact.data : []);
     } catch (error) {
-      console.error('❌ Failed to fetch leads:', error);
+      console.error('❌ Failed to fetch leads:', {
+        error: error.response?.data || error.message,
+        status: error.response?.status,
+      });
     }
   };
 
   const handleStatusChange = async (type, id, status) => {
     try {
       const headers = getAuthHeaders();
+      let url;
+      const payload = { status };
 
       if (type === 'b2b') {
-        await axios.put(`${API_URL}/leads/b2b/${id}`, { status }, { headers });
+        url = `${API_URL}/leads/b2b/${id}`;
       } else if (type === 'education') {
-        await axios.put(`${API_URL}/leads/education/${id}`, { status }, { headers });
+        url = `${API_URL}/leads/education/${id}`;
       } else {
-        await axios.put(`${API_URL}/contact/${id}`, { status }, { headers });
+        url = `${API_URL}/contact/${id}`;
       }
+
+      console.log('📡 API: PUT', url, payload);
+      await axios.put(url, payload, { headers });
 
       setSnackbar({
         open: true,

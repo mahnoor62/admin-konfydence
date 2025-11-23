@@ -449,11 +449,17 @@ function PartnersContent() {
   const fetchPartners = async () => {
     try {
       const headers = getAuthHeaders();
-      const res = await axios.get(`${API_URL}/partners`, { headers });
+      const url = `${API_URL}/partners`;
+      console.log('📡 API: GET', url);
+      const res = await axios.get(url, { headers });
       const data = Array.isArray(res.data) ? res.data : [];
       setPartners(data);
     } catch (error) {
-      console.error('Error fetching partners:', error);
+      console.error('❌ Error fetching partners:', {
+        url: `${API_URL}/partners`,
+        error: error.response?.data || error.message,
+        status: error.response?.status,
+      });
       setSnackbar({
         open: true,
         message: 'Failed to load partner logos',
@@ -521,18 +527,18 @@ function PartnersContent() {
       const headers = getAuthHeaders();
 
       if (editing) {
-        await axios.put(
-          `${API_URL}/partners/${editing._id}`,
-          formData,
-          { headers }
-        );
+        const url = `${API_URL}/partners/${editing._id}`;
+        console.log('📡 API: PUT', url, formData);
+        await axios.put(url, formData, { headers });
         setSnackbar({
           open: true,
           message: 'Partner logo updated successfully',
           severity: 'success',
         });
       } else {
-        await axios.post(`${API_URL}/partners`, formData, { headers });
+        const url = `${API_URL}/partners`;
+        console.log('📡 API: POST', url, formData);
+        await axios.post(url, formData, { headers });
         setSnackbar({
           open: true,
           message: 'Partner logo created successfully',
@@ -574,10 +580,9 @@ function PartnersContent() {
 
     try {
       const headers = getAuthHeaders();
-      await axios.delete(
-        `${API_URL}/partners/${partnerToDelete._id}`,
-        { headers }
-      );
+      const url = `${API_URL}/partners/${partnerToDelete._id}`;
+      console.log('📡 API: DELETE', url);
+      await axios.delete(url, { headers });
       setSnackbar({
         open: true,
         message: 'Partner logo deleted successfully',

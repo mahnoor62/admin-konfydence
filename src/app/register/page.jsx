@@ -52,12 +52,14 @@ export default function AdminRegister() {
     setLoading(true);
 
     try {
-      console.log(`📡 POST ${API_URL}/auth/register-admin`);
-      const res = await axios.post(`${API_URL}/auth/register-admin`, {
+      const url = `${API_URL}/auth/register-admin`;
+      const payload = {
         email: formData.email,
         password: formData.password,
         name: formData.name,
-      });
+      };
+      console.log('📡 API: POST', url, { email: payload.email, name: payload.name });
+      const res = await axios.post(url, payload);
       
       localStorage.setItem('admin_token', res.data.token);
       localStorage.setItem('admin_user', JSON.stringify(res.data.user));

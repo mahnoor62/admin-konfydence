@@ -42,7 +42,7 @@ export default function AdminLogin() {
 
     try {
       const url = `${API_URL}/auth/login`;
-      console.log(`📡 POST ${url}`);
+      console.log('📡 API: POST', url, { email: formData.email });
       const res = await axios.post(url, formData);
       localStorage.setItem('admin_token', res.data.token);
       localStorage.setItem('admin_user', JSON.stringify(res.data.user));

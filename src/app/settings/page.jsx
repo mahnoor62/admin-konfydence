@@ -19,38 +19,16 @@ if (!API_BASE_URL) {
 const API_URL = `${API_BASE_URL}/api`;
 console.log('🔗 Admin Settings API URL:', API_URL);
 
-function getApiInstance() {
-  const instance = axios.create({
-    baseURL: API_URL,
-    headers: {
-      'Content-Type': 'application/json',
-    },
-  });
-  
-  instance.interceptors.request.use((config) => {
-    const token = localStorage.getItem('admin_token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    console.log(`📡 ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`);
-    return config;
-  });
-  
-  instance.interceptors.response.use(
-    (response) => response,
-    (error) => {
-      console.error('❌ API Error:', {
-        url: error.config?.url,
-        method: error.config?.method,
-        status: error.response?.status,
-        message: error.response?.data?.error || error.message,
-        fullUrl: `${error.config?.baseURL}${error.config?.url}`,
-      });
-      return Promise.reject(error);
-    }
-  );
-  
-  return instance;
+function getAuthHeaders() {
+  if (typeof window === 'undefined') {
+    return {};
+  }
+  const token = localStorage.getItem('admin_token');
+  const headers = { 'Content-Type': 'application/json' };
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+  return headers;
 }
 
 function SettingsContent() {
@@ -76,8 +54,10 @@ function SettingsContent() {
 
   const fetchSettings = async () => {
     try {
-      const api = getApiInstance();
-      const res = await api.get('/settings');
+      const headers = getAuthHeaders();
+      const url = `${API_URL}/settings`;
+      console.log('📡 API: GET', url);
+      const res = await axios.get(url, { headers });
       setSettings(res.data);
       setFormData({
         heroB2CTitle: res.data.heroB2CTitle,
@@ -93,17 +73,28 @@ function SettingsContent() {
         founderName: res.data.founderName || '',
       });
     } catch (error) {
-      console.error('Error fetching settings:', error);
+      console.error('❌ Error fetching settings:', {
+        url: `${API_URL}/settings`,
+        error: error.response?.data || error.message,
+        status: error.response?.status,
+      });
     }
   };
 
   const handleSubmit = async () => {
     try {
-      const api = getApiInstance();
-      await api.put('/settings', formData);
+      const headers = getAuthHeaders();
+      const url = `${API_URL}/settings`;
+      console.log('📡 API: PUT', url, formData);
+      await axios.put(url, formData, { headers });
       setSnackbar({ open: true, message: 'Settings updated successfully', severity: 'success' });
       fetchSettings();
     } catch (error) {
+      console.error('❌ Error updating settings:', {
+        url: `${API_URL}/settings`,
+        error: error.response?.data || error.message,
+        status: error.response?.status,
+      });
       setSnackbar({ open: true, message: 'Error updating settings', severity: 'error' });
     }
   };

@@ -37,38 +37,16 @@ if (!API_BASE_URL) {
 const API_URL = `${API_BASE_URL}/api`;
 console.log('🔗 Admin Testimonials API URL:', API_URL);
 
-function getApiInstance() {
-  const instance = axios.create({
-    baseURL: API_URL,
-    headers: {
-      'Content-Type': 'application/json',
-    },
-  });
-  
-  instance.interceptors.request.use((config) => {
-    const token = localStorage.getItem('admin_token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    console.log(`📡 ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`);
-    return config;
-  });
-  
-  instance.interceptors.response.use(
-    (response) => response,
-    (error) => {
-      console.error('❌ API Error:', {
-        url: error.config?.url,
-        method: error.config?.method,
-        status: error.response?.status,
-        message: error.response?.data?.error || error.message,
-        fullUrl: `${error.config?.baseURL}${error.config?.url}`,
-      });
-      return Promise.reject(error);
-    }
-  );
-  
-  return instance;
+function getAuthHeaders() {
+  if (typeof window === 'undefined') {
+    return {};
+  }
+  const token = localStorage.getItem('admin_token');
+  const headers = { 'Content-Type': 'application/json' };
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+  return headers;
 }
 
 function TestimonialsContent() {
@@ -91,11 +69,19 @@ function TestimonialsContent() {
 
   const fetchTestimonials = async () => {
     try {
-      const api = getApiInstance();
-      const res = await api.get('/testimonials');
-      setTestimonials(res.data);
+      const headers = getAuthHeaders();
+      const url = `${API_URL}/testimonials`;
+      console.log('📡 API: GET', url);
+      const res = await axios.get(url, { headers });
+      const data = Array.isArray(res.data) ? res.data : [];
+      setTestimonials(data);
     } catch (error) {
-      console.error('Error fetching testimonials:', error);
+      console.error('❌ Error fetching testimonials:', {
+        url: `${API_URL}/testimonials`,
+        error: error.response?.data || error.message,
+        status: error.response?.status,
+      });
+      setTestimonials([]);
     }
   };
 
@@ -131,18 +117,26 @@ function TestimonialsContent() {
 
   const handleSubmit = async () => {
     try {
+      const headers = getAuthHeaders();
       if (editing) {
-        const api = getApiInstance();
-        await api.put(`/testimonials/${editing._id}`, formData);
+        const url = `${API_URL}/testimonials/${editing._id}`;
+        console.log('📡 API: PUT', url, formData);
+        await axios.put(url, formData, { headers });
         setSnackbar({ open: true, message: 'Testimonial updated successfully', severity: 'success' });
       } else {
-        const api = getApiInstance();
-        await api.post('/testimonials', formData);
+        const url = `${API_URL}/testimonials`;
+        console.log('📡 API: POST', url, formData);
+        await axios.post(url, formData, { headers });
         setSnackbar({ open: true, message: 'Testimonial created successfully', severity: 'success' });
       }
       handleClose();
       fetchTestimonials();
     } catch (error) {
+      console.error('❌ Error saving testimonial:', {
+        url: editing ? `${API_URL}/testimonials/${editing._id}` : `${API_URL}/testimonials`,
+        error: error.response?.data || error.message,
+        status: error.response?.status,
+      });
       setSnackbar({ open: true, message: error.response?.data?.error || 'Error saving testimonial', severity: 'error' });
     }
   };
@@ -150,11 +144,18 @@ function TestimonialsContent() {
   const handleDelete = async (id) => {
     if (confirm('Are you sure you want to delete this testimonial?')) {
       try {
-        const api = getApiInstance();
-        await api.delete(`/testimonials/${id}`);
+        const headers = getAuthHeaders();
+        const url = `${API_URL}/testimonials/${id}`;
+        console.log('📡 API: DELETE', url);
+        await axios.delete(url, { headers });
         setSnackbar({ open: true, message: 'Testimonial deleted successfully', severity: 'success' });
         fetchTestimonials();
       } catch (error) {
+        console.error('❌ Error deleting testimonial:', {
+          url: `${API_URL}/testimonials/${id}`,
+          error: error.response?.data || error.message,
+          status: error.response?.status,
+        });
         setSnackbar({ open: true, message: 'Error deleting testimonial', severity: 'error' });
       }
     }

@@ -194,6 +194,13 @@ export default function AdminDashboard() {
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         };
 
+        console.log('📡 API: GET', `${API_URL}/products`, { all: true, includeInactive: true });
+        console.log('📡 API: GET', `${API_URL}/blog`, { all: true });
+        console.log('📡 API: GET', `${API_URL}/testimonials`);
+        console.log('📡 API: GET', `${API_URL}/leads/b2b`);
+        console.log('📡 API: GET', `${API_URL}/leads/education`);
+        console.log('📡 API: GET', `${API_URL}/contact`);
+
         const [productsRes, blogRes, testimonialsRes, b2bLeadsRes, eduLeadsRes, contactRes] =
           await Promise.all([
             axios.get(`${API_URL}/products`, {

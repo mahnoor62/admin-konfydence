@@ -831,14 +831,18 @@ function BlogContent() {
   const fetchPosts = async () => {
     try {
       const headers = getAuthHeaders();
-      const res = await axios.get(`${API_URL}/blog`, {
-        headers,
-        params: { all: true },
-      });
+      const url = `${API_URL}/blog`;
+      const params = { all: true };
+      console.log('📡 API: GET', url, params);
+      const res = await axios.get(url, { headers, params });
       const postsData = Array.isArray(res.data) ? res.data : res.data.posts || [];
       setPosts(postsData);
     } catch (error) {
-      console.error('Error fetching posts:', error);
+      console.error('❌ Error fetching posts:', {
+        url: `${API_URL}/blog`,
+        error: error.response?.data || error.message,
+        status: error.response?.status,
+      });
       let errorMessage = 'Failed to load blog posts';
       if (error.response?.data?.error) {
         errorMessage = error.response.data.error;
@@ -850,10 +854,10 @@ function BlogContent() {
   const fetchCategories = async () => {
     try {
       const headers = getAuthHeaders();
-      const res = await axios.get(`${API_URL}/blog-categories`, {
-        headers,
-        params: { active: 'true', _t: Date.now() },
-      });
+      const url = `${API_URL}/blog-categories`;
+      const params = { active: 'true', _t: Date.now() };
+      console.log('📡 API: GET', url, params);
+      const res = await axios.get(url, { headers, params });
       const data = Array.isArray(res.data) ? res.data : [];
       setCategories(data);
       if (data.length > 0) {
@@ -863,21 +867,29 @@ function BlogContent() {
         });
       }
     } catch (error) {
-      console.error('Error fetching categories:', error);
+      console.error('❌ Error fetching categories:', {
+        url: `${API_URL}/blog-categories`,
+        error: error.response?.data || error.message,
+        status: error.response?.status,
+      });
     }
   };
 
   const fetchTags = async () => {
     try {
       const headers = getAuthHeaders();
-      const res = await axios.get(`${API_URL}/blog-tags`, {
-        headers,
-        params: { active: 'true', _t: Date.now() },
-      });
+      const url = `${API_URL}/blog-tags`;
+      const params = { active: 'true', _t: Date.now() };
+      console.log('📡 API: GET', url, params);
+      const res = await axios.get(url, { headers, params });
       const data = Array.isArray(res.data) ? res.data : [];
       setTags(data);
     } catch (error) {
-      console.error('Error fetching tags:', error);
+      console.error('❌ Error fetching tags:', {
+        url: `${API_URL}/blog-tags`,
+        error: error.response?.data || error.message,
+        status: error.response?.status,
+      });
     }
   };
 
@@ -986,14 +998,18 @@ function BlogContent() {
       const headers = getAuthHeaders();
 
       if (editing) {
-        await axios.put(`${API_URL}/blog/${editing._id}`, payload, { headers });
+        const url = `${API_URL}/blog/${editing._id}`;
+        console.log('📡 API: PUT', url, payload);
+        await axios.put(url, payload, { headers });
         setSnackbar({
           open: true,
           message: 'Post updated successfully',
           severity: 'success',
         });
       } else {
-        await axios.post(`${API_URL}/blog`, payload, { headers });
+        const url = `${API_URL}/blog`;
+        console.log('📡 API: POST', url, payload);
+        await axios.post(url, payload, { headers });
         setSnackbar({
           open: true,
           message: 'Post created successfully',
@@ -1035,7 +1051,9 @@ function BlogContent() {
 
     try {
       const headers = getAuthHeaders();
-      await axios.delete(`${API_URL}/blog/${postToDelete._id}`, { headers });
+      const url = `${API_URL}/blog/${postToDelete._id}`;
+      console.log('📡 API: DELETE', url);
+      await axios.delete(url, { headers });
       setSnackbar({
         open: true,
         message: 'Post deleted successfully',
@@ -1090,11 +1108,10 @@ function BlogContent() {
         return;
       }
       const headers = getAuthHeaders();
-      await axios.post(
-        `${API_URL}/blog-categories`,
-        { name: categoryFormData.name.trim() },
-        { headers }
-      );
+      const url = `${API_URL}/blog-categories`;
+      const payload = { name: categoryFormData.name.trim() };
+      console.log('📡 API: POST', url, payload);
+      await axios.post(url, payload, { headers });
       setSnackbar({
         open: true,
         message: 'Category created successfully',
@@ -1132,11 +1149,10 @@ function BlogContent() {
         return;
       }
       const headers = getAuthHeaders();
-      await axios.post(
-        `${API_URL}/blog-tags`,
-        { name: tagFormData.name.trim() },
-        { headers }
-      );
+      const url = `${API_URL}/blog-tags`;
+      const payload = { name: tagFormData.name.trim() };
+      console.log('📡 API: POST', url, payload);
+      await axios.post(url, payload, { headers });
       setSnackbar({
         open: true,
         message: 'Tag created successfully',
@@ -1174,7 +1190,9 @@ function BlogContent() {
       const headers = getAuthHeaders({
         'Content-Type': 'multipart/form-data',
       });
-      const res = await axios.post(`${API_URL}/uploads`, form, { headers });
+      const url = `${API_URL}/uploads`;
+      console.log('📡 API: POST', url, '[FormData]');
+      const res = await axios.post(url, form, { headers });
       setFormData((prev) => ({
         ...prev,
         featuredImage: res.data.url,
