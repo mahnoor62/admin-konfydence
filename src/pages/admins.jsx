@@ -1,6 +1,6 @@
-'use client';
+// // 'use client';
 
-import Admins from '@/components/admin/admins/page';
+// import Admins from '@/components/admin/admins/page';
 
-export default Admins;
+// export default Admins;
 

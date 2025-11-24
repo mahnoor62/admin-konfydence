@@ -183,66 +183,147 @@ export default function AdminDashboard() {
   useEffect(() => {
     let isMounted = true;
 
+    // async function fetchStats() {
+    //   try {
+    //     const token = typeof window !== 'undefined'
+    //       ? localStorage.getItem('admin_token')
+    //       : null;
+
+    //     const headers = {
+    //       'Content-Type': 'application/json',
+    //       ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    //     };
+
+    //     console.log('📡 API: GET', `${API_URL}/products`, { all: true, includeInactive: true });
+    //     console.log('📡 API: GET', `${API_URL}/blog`, { all: true });
+    //     console.log('📡 API: GET', `${API_URL}/testimonials`);
+    //     console.log('📡 API: GET', `${API_URL}/leads/b2b`);
+    //     console.log('📡 API: GET', `${API_URL}/leads/education`);
+    //     console.log('📡 API: GET', `${API_URL}/contact`);
+
+    //     const [productsRes, blogRes, testimonialsRes, b2bLeadsRes, eduLeadsRes, contactRes] =
+    //       await Promise.all([
+    //         axios.get(`${API_URL}/products`, {
+    //           headers,
+    //           params: { all: true, includeInactive: true },
+    //         }),
+    //         axios.get(`${API_URL}/blog`, {
+    //           headers,
+    //           params: { all: true },
+    //         }),
+    //         axios.get(`${API_URL}/testimonials`, { headers }),
+    //         axios.get(`${API_URL}/leads/b2b`, { headers }),
+    //         axios.get(`${API_URL}/leads/education`, { headers }),
+    //         axios.get(`${API_URL}/contact`, { headers }),
+    //       ]);
+
+    //     if (!isMounted) return;
+
+    //     const products = Array.isArray(productsRes.data)
+    //       ? productsRes.data.length
+    //       : productsRes.data?.products?.length || productsRes.data?.length || 0;
+
+    //     const blogPosts = Array.isArray(blogRes.data)
+    //       ? blogRes.data.length
+    //       : blogRes.data?.posts?.length || 0;
+
+    //     const testimonials = Array.isArray(testimonialsRes.data)
+    //       ? testimonialsRes.data.length
+    //       : 0;
+
+    //     const b2bLeads = Array.isArray(b2bLeadsRes.data)
+    //       ? b2bLeadsRes.data.length
+    //       : 0;
+
+    //     const eduLeads = Array.isArray(eduLeadsRes.data)
+    //       ? eduLeadsRes.data.length
+    //       : 0;
+
+    //     const contactMessages = Array.isArray(contactRes.data)
+    //       ? contactRes.data.length
+    //       : 0;
+
+    //     setStats({
+    //       products,
+    //       blogPosts,
+    //       testimonials,
+    //       b2bLeads,
+    //       educationLeads: eduLeads,
+    //       contactMessages,
+    //     });
+    //   } catch (error) {
+    //     console.error('❌ Error fetching dashboard stats:', {
+    //       url: API_URL,
+    //       error: error?.response?.data || error?.message,
+    //       status: error?.response?.status,
+    //     });
+    //   }
+    // }
     async function fetchStats() {
       try {
         const token = typeof window !== 'undefined'
           ? localStorage.getItem('admin_token')
           : null;
-
+    
         const headers = {
           'Content-Type': 'application/json',
+          'Cache-Control': 'no-store, no-cache, must-revalidate',
+          Pragma: 'no-cache',
+          Expires: '0',
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         };
-
-        console.log('📡 API: GET', `${API_URL}/products`, { all: true, includeInactive: true });
-        console.log('📡 API: GET', `${API_URL}/blog`, { all: true });
-        console.log('📡 API: GET', `${API_URL}/testimonials`);
-        console.log('📡 API: GET', `${API_URL}/leads/b2b`);
-        console.log('📡 API: GET', `${API_URL}/leads/education`);
-        console.log('📡 API: GET', `${API_URL}/contact`);
-
-        const [productsRes, blogRes, testimonialsRes, b2bLeadsRes, eduLeadsRes, contactRes] =
-          await Promise.all([
-            axios.get(`${API_URL}/products`, {
-              headers,
-              params: { all: true, includeInactive: true },
-            }),
-            axios.get(`${API_URL}/blog`, {
-              headers,
-              params: { all: true },
-            }),
-            axios.get(`${API_URL}/testimonials`, { headers }),
-            axios.get(`${API_URL}/leads/b2b`, { headers }),
-            axios.get(`${API_URL}/leads/education`, { headers }),
-            axios.get(`${API_URL}/contact`, { headers }),
-          ]);
-
+    
+        const timestamp = Date.now(); // unique per request
+        const params = { _t: timestamp };
+    
+        const [
+          productsRes,
+          blogRes,
+          testimonialsRes,
+          b2bLeadsRes,
+          eduLeadsRes,
+          contactRes,
+        ] = await Promise.all([
+          axios.get(`${API_URL}/products`, {
+            headers,
+            params: { all: true, includeInactive: true, _t: timestamp },
+          }),
+          axios.get(`${API_URL}/blog`, {
+            headers,
+            params: { all: true, _t: timestamp },
+          }),
+          axios.get(`${API_URL}/testimonials`, { headers, params }),
+          axios.get(`${API_URL}/leads/b2b`, { headers, params }),
+          axios.get(`${API_URL}/leads/education`, { headers, params }),
+          axios.get(`${API_URL}/contact`, { headers, params }),
+        ]);
+    
         if (!isMounted) return;
-
+    
         const products = Array.isArray(productsRes.data)
           ? productsRes.data.length
-          : productsRes.data?.products?.length || productsRes.data?.length || 0;
-
+          : productsRes.data?.products?.length || 0;
+    
         const blogPosts = Array.isArray(blogRes.data)
           ? blogRes.data.length
           : blogRes.data?.posts?.length || 0;
-
+    
         const testimonials = Array.isArray(testimonialsRes.data)
           ? testimonialsRes.data.length
           : 0;
-
+    
         const b2bLeads = Array.isArray(b2bLeadsRes.data)
           ? b2bLeadsRes.data.length
           : 0;
-
+    
         const eduLeads = Array.isArray(eduLeadsRes.data)
           ? eduLeadsRes.data.length
           : 0;
-
+    
         const contactMessages = Array.isArray(contactRes.data)
           ? contactRes.data.length
           : 0;
-
+    
         setStats({
           products,
           blogPosts,
@@ -259,7 +340,7 @@ export default function AdminDashboard() {
         });
       }
     }
-
+    
     fetchStats();
 
     return () => {

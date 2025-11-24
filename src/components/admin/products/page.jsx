@@ -783,11 +783,13 @@ function getAuthHeaders(extraHeaders = {}) {
   if (typeof window === 'undefined') {
     return { ...extraHeaders };
   }
+
   const token = localStorage.getItem('admin_token');
   const headers = {
     'Content-Type': 'application/json',
     ...extraHeaders,
   };
+
   if (token) {
     headers.Authorization = `Bearer ${token}`;
   }
@@ -831,16 +833,45 @@ function ProductsContent() {
 
   // --------- FETCH HELPERS (simple axios) ----------
 
+  // const fetchProducts = async () => {
+  //   try {
+  //     const headers = getAuthHeaders();
+  //     const url = `${API_URL}/products`;
+  //     const params = { includeInactive: true, all: true };
+  //     console.log('📡 API: GET', url, params);
+  //     const res = await axios.get(url, { headers, params });
+  //     const productsData = Array.isArray(res.data)
+  //       ? res.data
+  //       : res.data.products || [];
+  //     console.log('📦 Products fetched:', productsData.length, 'items');
+  //     setProducts(productsData);
+  //   } catch (error) {
+  //     console.error('❌ Error fetching products:', {
+  //       url: `${API_URL}/products`,
+  //       error: error.response?.data || error.message,
+  //       status: error.response?.status,
+  //     });
+  //     setProducts([]);
+  //   }
+  // };
+
   const fetchProducts = async () => {
     try {
-      const headers = getAuthHeaders();
+      const headers = getAuthHeaders({
+        'Cache-Control': 'no-store',
+        Pragma: 'no-cache',
+      });
+  
       const url = `${API_URL}/products`;
-      const params = { includeInactive: true, all: true };
+      const params = { includeInactive: true, all: true, _t: Date.now() };
+  
       console.log('📡 API: GET', url, params);
       const res = await axios.get(url, { headers, params });
+  
       const productsData = Array.isArray(res.data)
         ? res.data
         : res.data.products || [];
+  
       console.log('📦 Products fetched:', productsData.length, 'items');
       setProducts(productsData);
     } catch (error) {
@@ -852,24 +883,23 @@ function ProductsContent() {
       setProducts([]);
     }
   };
-
-
-  useEffect(() => {
-    fetchProducts();
-    fetchProductTypes();
-    fetchBadges();
-  },[])
-
   const fetchProductTypes = async () => {
     try {
-      const headers = getAuthHeaders();
+      const headers = getAuthHeaders({
+        'Cache-Control': 'no-store',
+        Pragma: 'no-cache',
+      });
+  
       const url = `${API_URL}/product-types`;
       const params = { active: 'true', _t: Date.now() };
+  
       console.log('📡 API: GET', url, params);
       const res = await axios.get(url, { headers, params });
+  
       const typesData = Array.isArray(res.data) ? res.data : [];
       setProductTypes(typesData);
-
+  
+      // default type set karo sirf jab pehle se koi type na ho
       if (typesData.length > 0) {
         setFormData((prev) => {
           if (prev.type) return prev;
@@ -885,14 +915,19 @@ function ProductsContent() {
       setProductTypes([]);
     }
   };
-
   const fetchBadges = async () => {
     try {
-      const headers = getAuthHeaders();
+      const headers = getAuthHeaders({
+        'Cache-Control': 'no-store',
+        Pragma: 'no-cache',
+      });
+  
       const url = `${API_URL}/badges`;
       const params = { active: 'true', _t: Date.now() };
+  
       console.log('📡 API: GET', url, params);
       const res = await axios.get(url, { headers, params });
+  
       const badgesData = Array.isArray(res.data) ? res.data : [];
       setBadges(badgesData);
     } catch (error) {
@@ -904,6 +939,53 @@ function ProductsContent() {
       setBadges([]);
     }
   };
+    
+
+
+  // const fetchProductTypes = async () => {
+  //   try {
+  //     const headers = getAuthHeaders();
+  //     const url = `${API_URL}/product-types`;
+  //     const params = { active: 'true', _t: Date.now() };
+  //     console.log('📡 API: GET', url, params);
+  //     const res = await axios.get(url, { headers, params });
+  //     const typesData = Array.isArray(res.data) ? res.data : [];
+  //     setProductTypes(typesData);
+
+  //     if (typesData.length > 0) {
+  //       setFormData((prev) => {
+  //         if (prev.type) return prev;
+  //         return { ...prev, type: typesData[0].slug };
+  //       });
+  //     }
+  //   } catch (error) {
+  //     console.error('❌ Error fetching product types:', {
+  //       url: `${API_URL}/product-types`,
+  //       error: error.response?.data || error.message,
+  //       status: error.response?.status,
+  //     });
+  //     setProductTypes([]);
+  //   }
+  // };
+
+  // const fetchBadges = async () => {
+  //   try {
+  //     const headers = getAuthHeaders();
+  //     const url = `${API_URL}/badges`;
+  //     const params = { active: 'true', _t: Date.now() };
+  //     console.log('📡 API: GET', url, params);
+  //     const res = await axios.get(url, { headers, params });
+  //     const badgesData = Array.isArray(res.data) ? res.data : [];
+  //     setBadges(badgesData);
+  //   } catch (error) {
+  //     console.error('❌ Error fetching badges:', {
+  //       url: `${API_URL}/badges`,
+  //       error: error.response?.data || error.message,
+  //       status: error.response?.status,
+  //     });
+  //     setBadges([]);
+  //   }
+  // };
 
   useEffect(() => {
     // sirf mount pe run hoga

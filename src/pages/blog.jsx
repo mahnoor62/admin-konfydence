@@ -1,4 +1,4 @@
-'use client';
+// 'use client';
 
 import Blog from '@/components/admin/blog/page';
 
