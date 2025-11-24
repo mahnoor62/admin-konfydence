@@ -4,7 +4,7 @@ export default function Document() {
   return (
     <Html lang="en">
       <Head>
-        <title>Konfydence Admin Panel</title>
+        {/* <title>Konfydence Admin Panel</title> */}
         <meta name="description" content="Admin panel for Konfydence" />
       </Head>
       <body>
