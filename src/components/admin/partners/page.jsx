@@ -408,20 +408,36 @@ const API_URL = `${API_BASE_URL}/api`;
 console.log('🔗 Admin Partners API URL:', API_URL);
 
 // simple auth headers helper (no axios instance)
+// function getAuthHeaders(extraHeaders = {}) {
+//   if (typeof window === 'undefined') {
+//     return { ...extraHeaders };
+//   }
+//   const token = localStorage.getItem('admin_token');
+//   const headers = {
+//     'Content-Type': 'application/json',
+//     ...extraHeaders,
+//   };
+//   if (token) {
+//     headers.Authorization = `Bearer ${token}`;
+//   }
+//   return headers;
+// }
 function getAuthHeaders(extraHeaders = {}) {
-  if (typeof window === 'undefined') {
-    return { ...extraHeaders };
-  }
-  const token = localStorage.getItem('admin_token');
+  const token =
+    typeof window !== 'undefined' ? localStorage.getItem('admin_token') : null;
+
   const headers = {
     'Content-Type': 'application/json',
+    'Cache-Control': 'no-store, no-cache, must-revalidate',
+    Pragma: 'no-cache',
+    Expires: '0',
     ...extraHeaders,
   };
-  if (token) {
-    headers.Authorization = `Bearer ${token}`;
-  }
+
+  if (token) headers.Authorization = `Bearer ${token}`;
   return headers;
 }
+
 
 function PartnersContent() {
   const [partners, setPartners] = useState([]);
@@ -446,12 +462,43 @@ function PartnersContent() {
     fetchPartners();
   }, []);
 
+  // const fetchPartners = async () => {
+  //   try {
+    
+
+  //     const headers = getAuthHeaders();
+  //     const url = `${API_URL}/partners`;
+  //     console.log('📡 API: GET', url);
+  //     const res = await axios.get(url, { headers });
+  
+  //     const data = Array.isArray(res.data) ? res.data : [];
+  //     setPartners(data);
+  //   } catch (error) {
+  //     console.error('❌ Error fetching partners:', {
+  //       url: `${API_URL}/partners`,
+  //       error: error.response?.data || error.message,
+  //       status: error.response?.status,
+  //     });
+  //     setSnackbar({
+  //       open: true,
+  //       message: 'Failed to load partner logos',
+  //       severity: 'error',
+  //     });
+  //   }
+  // };
+
   const fetchPartners = async () => {
     try {
       const headers = getAuthHeaders();
       const url = `${API_URL}/partners`;
+  
       console.log('📡 API: GET', url);
-      const res = await axios.get(url, { headers });
+  
+      const res = await axios.get(url, {
+        headers,
+        params: { _t: Date.now() }, // 🔥 prevent any caching
+      });
+  
       const data = Array.isArray(res.data) ? res.data : [];
       setPartners(data);
     } catch (error) {
@@ -460,6 +507,7 @@ function PartnersContent() {
         error: error.response?.data || error.message,
         status: error.response?.status,
       });
+  
       setSnackbar({
         open: true,
         message: 'Failed to load partner logos',
@@ -467,6 +515,7 @@ function PartnersContent() {
       });
     }
   };
+  
 
   const handleOpen = (partner) => {
     if (partner) {

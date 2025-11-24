@@ -781,20 +781,43 @@ const API_URL = `${API_BASE_URL}/api`;
 console.log('🔗 Admin Blog API URL:', API_URL);
 
 // simple headers helper (no axios instance)
+// function getAuthHeaders(extraHeaders = {}) {
+//   if (typeof window === 'undefined') {
+//     return { ...extraHeaders };
+//   }
+//   const token = localStorage.getItem('admin_token');
+//   const headers = {
+//     'Content-Type': 'application/json',
+//     ...extraHeaders,
+//   };
+//   if (token) {
+//     headers.Authorization = `Bearer ${token}`;
+//   }
+//   return headers;
+// }
+
 function getAuthHeaders(extraHeaders = {}) {
   if (typeof window === 'undefined') {
     return { ...extraHeaders };
   }
+
   const token = localStorage.getItem('admin_token');
+
   const headers = {
     'Content-Type': 'application/json',
+    'Cache-Control': 'no-store, no-cache, must-revalidate',
+    Pragma: 'no-cache',
+    Expires: '0',
     ...extraHeaders,
   };
+
   if (token) {
     headers.Authorization = `Bearer ${token}`;
   }
+
   return headers;
 }
+
 
 function BlogContent() {
   const [posts, setPosts] = useState([]);
@@ -828,14 +851,41 @@ function BlogContent() {
 
   // ---------- FETCH HELPERS (simple axios) ----------
 
+  // const fetchPosts = async () => {
+  //   try {
+  //     const headers = getAuthHeaders();
+  //     const url = `${API_URL}/blog`;
+  //     const params = { all: true };
+  //     console.log('📡 API: GET', url, params);
+  //     const res = await axios.get(url, { headers, params });
+  //     const postsData = Array.isArray(res.data) ? res.data : res.data.posts || [];
+  //     setPosts(postsData);
+  //   } catch (error) {
+  //     console.error('❌ Error fetching posts:', {
+  //       url: `${API_URL}/blog`,
+  //       error: error.response?.data || error.message,
+  //       status: error.response?.status,
+  //     });
+  //     let errorMessage = 'Failed to load blog posts';
+  //     if (error.response?.data?.error) {
+  //       errorMessage = error.response.data.error;
+  //     }
+  //     setSnackbar({ open: true, message: errorMessage, severity: 'error' });
+  //   }
+  // };
   const fetchPosts = async () => {
     try {
       const headers = getAuthHeaders();
       const url = `${API_URL}/blog`;
-      const params = { all: true };
+      const params = { all: true, _t: Date.now() }; // 🔥 anti-cache param
+  
       console.log('📡 API: GET', url, params);
       const res = await axios.get(url, { headers, params });
-      const postsData = Array.isArray(res.data) ? res.data : res.data.posts || [];
+  
+      const postsData = Array.isArray(res.data)
+        ? res.data
+        : res.data.posts || [];
+  
       setPosts(postsData);
     } catch (error) {
       console.error('❌ Error fetching posts:', {
@@ -850,6 +900,7 @@ function BlogContent() {
       setSnackbar({ open: true, message: errorMessage, severity: 'error' });
     }
   };
+  
 
   const fetchCategories = async () => {
     try {

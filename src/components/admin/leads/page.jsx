@@ -338,12 +338,28 @@ const API_URL = `${API_BASE_URL}/api`;
 console.log('🔗 Admin Leads API URL:', API_URL);
 
 // 🔥 Simple auth header helper
+// function getAuthHeaders() {
+//   const token = typeof window !== 'undefined' ? localStorage.getItem('admin_token') : null;
+//   const headers = { 'Content-Type': 'application/json' };
+//   if (token) headers.Authorization = `Bearer ${token}`;
+//   return headers;
+// }
 function getAuthHeaders() {
-  const token = typeof window !== 'undefined' ? localStorage.getItem('admin_token') : null;
-  const headers = { 'Content-Type': 'application/json' };
+  const token = typeof window !== 'undefined'
+    ? localStorage.getItem('admin_token')
+    : null;
+
+  const headers = {
+    'Content-Type': 'application/json',
+    'Cache-Control': 'no-store, no-cache, must-revalidate',
+    Pragma: 'no-cache',
+    Expires: '0',
+  };
+
   if (token) headers.Authorization = `Bearer ${token}`;
   return headers;
 }
+
 
 function TabPanel({ children, value, index }) {
   return value === index ? <Box sx={{ pt: 3 }}>{children}</Box> : null;
@@ -372,11 +388,30 @@ function LeadsContent() {
       console.log('📡 API: GET', `${API_URL}/leads/education`);
       console.log('📡 API: GET', `${API_URL}/contact`);
 
+      const timestamp = Date.now(); // 🔥 unique per request
+
       const [b2b, edu, contact] = await Promise.all([
-        axios.get(`${API_URL}/leads/b2b`, { headers }),
-        axios.get(`${API_URL}/leads/education`, { headers }),
-        axios.get(`${API_URL}/contact`, { headers }),
+        axios.get(`${API_URL}/leads/b2b`, {
+          headers,
+          params: { _t: timestamp },
+        }),
+        axios.get(`${API_URL}/leads/education`, {
+          headers,
+          params: { _t: timestamp },
+        }),
+        axios.get(`${API_URL}/contact`, {
+          headers,
+          params: { _t: timestamp },
+        }),
       ]);
+      
+
+
+      // const [b2b, edu, contact] = await Promise.all([
+      //   axios.get(`${API_URL}/leads/b2b`, { headers }),
+      //   axios.get(`${API_URL}/leads/education`, { headers }),
+      //   axios.get(`${API_URL}/contact`, { headers }),
+      // ]);
 
       setB2bLeads(Array.isArray(b2b.data) ? b2b.data : []);
       setEduLeads(Array.isArray(edu.data) ? edu.data : []);
@@ -404,7 +439,13 @@ function LeadsContent() {
       }
 
       console.log('📡 API: PUT', url, payload);
-      await axios.put(url, payload, { headers });
+      // await axios.put(url, payload, { headers });
+
+      await axios.put(url, payload, {
+        headers,
+        params: { _t: Date.now() },
+      });
+      
 
       setSnackbar({
         open: true,
