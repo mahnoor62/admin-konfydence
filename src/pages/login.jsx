@@ -1,8 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import Link from 'next/link';
+import { useRouter } from 'next/router';
 import {
   Container,
   Box,
@@ -20,16 +19,16 @@ if (!API_BASE_URL) {
   throw new Error('NEXT_PUBLIC_API_URL environment variable is missing!');
 }
 const API_URL = `${API_BASE_URL}/api`;
-console.log('🔗 Admin Register API URL:', API_URL);
+console.log('🔗 Admin Login API URL:', API_URL);
 
-export default function AdminRegister() {
+export default function AdminLogin() {
   const router = useRouter();
-  const [formData, setFormData] = useState({ name: '', email: '', password: '', confirmPassword: '' });
+  const [formData, setFormData] = useState({ email: '', password: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    const token = localStorage.getItem('admin_token');
+    const token = typeof window !== 'undefined' ? localStorage.getItem('admin_token') : null;
     if (token) {
       router.push('/');
     }
@@ -38,34 +37,24 @@ export default function AdminRegister() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-
-    if (formData.password !== formData.confirmPassword) {
-      setError('Passwords do not match');
-      return;
-    }
-
-    if (formData.password.length < 6) {
-      setError('Password must be at least 6 characters');
-      return;
-    }
-
     setLoading(true);
 
     try {
-      const url = `${API_URL}/auth/register-admin`;
-      const payload = {
-        email: formData.email,
-        password: formData.password,
-        name: formData.name,
-      };
-      console.log('📡 API: POST', url, { email: payload.email, name: payload.name });
-      const res = await axios.post(url, payload);
-      
-      localStorage.setItem('admin_token', res.data.token);
-      localStorage.setItem('admin_user', JSON.stringify(res.data.user));
+      const url = `${API_URL}/auth/login`;
+      console.log('📡 API: POST', url, { email: formData.email });
+      const res = await axios.post(url, formData);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('admin_token', res.data.token);
+        localStorage.setItem('admin_user', JSON.stringify(res.data.user));
+      }
       router.push('/');
     } catch (err) {
-      setError(err.response?.data?.error || 'Registration failed. Please try again.');
+      console.error('❌ Login error:', {
+        url: `${API_URL}/auth/login`,
+        error: err.response?.data || err.message,
+        status: err.response?.status,
+      });
+      setError(err.response?.data?.error || 'Login failed. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -91,10 +80,10 @@ export default function AdminRegister() {
         >
           <CardContent sx={{ p: { xs: 3, md: 4 } }}>
             <Typography variant="h4" gutterBottom textAlign="center" fontWeight={600}>
-              Admin Registration
+              Admin Login
             </Typography>
             <Typography variant="body2" color="text.secondary" textAlign="center" sx={{ mb: 4 }}>
-              Create a new admin account
+              Konfydence Admin Panel
             </Typography>
 
             {error && (
@@ -104,13 +93,6 @@ export default function AdminRegister() {
             )}
 
             <Box component="form" onSubmit={handleSubmit}>
-              <TextField
-                fullWidth
-                label="Name (optional)"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                sx={{ mb: 2 }}
-              />
               <TextField
                 fullWidth
                 label="Email"
@@ -127,16 +109,6 @@ export default function AdminRegister() {
                 required
                 value={formData.password}
                 onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                sx={{ mb: 2 }}
-                helperText="Minimum 6 characters"
-              />
-              <TextField
-                fullWidth
-                label="Confirm Password"
-                type="password"
-                required
-                value={formData.confirmPassword}
-                onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
                 sx={{ mb: 3 }}
               />
               <Button
@@ -146,16 +118,8 @@ export default function AdminRegister() {
                 size="large"
                 disabled={loading}
               >
-                {loading ? 'Registering...' : 'Register'}
+                {loading ? 'Logging in...' : 'Login'}
               </Button>
-              <Box sx={{ mt: 2, textAlign: 'center' }}>
-                <Typography variant="body2">
-                  Already have an account?{' '}
-                  <Link href="/login" style={{ color: 'inherit', textDecoration: 'underline', cursor: 'pointer' }}>
-                    Login
-                  </Link>
-                </Typography>
-              </Box>
             </Box>
           </CardContent>
         </Card>

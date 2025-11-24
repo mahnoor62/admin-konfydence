@@ -35,10 +35,8 @@ const menuItems = [
   { label: 'Dashboard', href: '/', icon: DashboardIcon },
   { label: 'Products', href: '/products', icon: ShoppingBagIcon },
   { label: 'Blog Posts', href: '/blog', icon: ArticleIcon },
-  // { label: 'Testimonials', href: '/testimonials', icon: RateReviewIcon },
   { label: 'Partner Logos', href: '/partners', icon: BusinessIcon },
   { label: 'Leads', href: '/leads', icon: ContactMailIcon },
-  // { label: 'Admins', href: '/admins', icon: PeopleIcon },
 ];
 
 export default function AdminLayout({ children }) {
