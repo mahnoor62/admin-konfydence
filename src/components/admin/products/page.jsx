@@ -853,6 +853,13 @@ function ProductsContent() {
     }
   };
 
+
+  useEffect(() => {
+    fetchProducts();
+    fetchProductTypes();
+    fetchBadges();
+  },[])
+
   const fetchProductTypes = async () => {
     try {
       const headers = getAuthHeaders();
