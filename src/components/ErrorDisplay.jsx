@@ -1,5 +1,5 @@
 'use client';
-
+export const dynamic = 'force-dynamic';
 import { Alert, AlertTitle, Box, Typography } from '@mui/material';
 import ErrorIcon from '@mui/icons-material/Error';
 

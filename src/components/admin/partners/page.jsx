@@ -369,7 +369,7 @@
 // }
 
 'use client';
-
+export const dynamic = 'force-dynamic';
 import AdminLayout from '@/components/AdminLayout';
 import { useState, useEffect } from 'react';
 import {

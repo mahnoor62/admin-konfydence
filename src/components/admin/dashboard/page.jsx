@@ -161,7 +161,7 @@
 // }
 
 'use client';
-
+export const dynamic = 'force-dynamic';
 import { useState, useEffect } from 'react';
 import { Grid, Card, CardContent, Typography, Box } from '@mui/material';
 import axios from 'axios';
