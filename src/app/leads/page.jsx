@@ -438,8 +438,28 @@ function LeadsContent() {
 
       {/* -------- B2B LEADS -------- */}
       <TabPanel value={tab} index={0}>
-        <TableContainer component={Paper}>
-          <Table>
+        <TableContainer 
+          component={Paper}
+          sx={{
+            width: '100%',
+            overflowX: 'auto',
+            WebkitOverflowScrolling: 'touch',
+            marginTop: 2,
+            marginBottom: 2,
+            '& .MuiTable-root': {
+              minWidth: 650,
+              width: '100%',
+            },
+            '& .MuiTableCell-root': {
+              whiteSpace: 'nowrap',
+              '@media (max-width: 600px)': {
+                padding: '8px 4px',
+                fontSize: '0.875rem',
+              },
+            },
+          }}
+        >
+          <Table stickyHeader>
             <TableHead>
               <TableRow>
                 <TableCell>Name</TableCell>
@@ -492,8 +512,28 @@ function LeadsContent() {
 
       {/* -------- EDUCATION LEADS -------- */}
       <TabPanel value={tab} index={1}>
-        <TableContainer component={Paper}>
-          <Table>
+        <TableContainer 
+          component={Paper}
+          sx={{
+            width: '100%',
+            overflowX: 'auto',
+            WebkitOverflowScrolling: 'touch',
+            marginTop: 2,
+            marginBottom: 2,
+            '& .MuiTable-root': {
+              minWidth: 650,
+              width: '100%',
+            },
+            '& .MuiTableCell-root': {
+              whiteSpace: 'nowrap',
+              '@media (max-width: 600px)': {
+                padding: '8px 4px',
+                fontSize: '0.875rem',
+              },
+            },
+          }}
+        >
+          <Table stickyHeader>
             <TableHead>
               <TableRow>
                 <TableCell>School</TableCell>
@@ -548,8 +588,28 @@ function LeadsContent() {
 
       {/* -------- CONTACT MESSAGES -------- */}
       <TabPanel value={tab} index={2}>
-        <TableContainer component={Paper}>
-          <Table>
+        <TableContainer 
+          component={Paper}
+          sx={{
+            width: '100%',
+            overflowX: 'auto',
+            WebkitOverflowScrolling: 'touch',
+            marginTop: 2,
+            marginBottom: 2,
+            '& .MuiTable-root': {
+              minWidth: 650,
+              width: '100%',
+            },
+            '& .MuiTableCell-root': {
+              whiteSpace: 'nowrap',
+              '@media (max-width: 600px)': {
+                padding: '8px 4px',
+                fontSize: '0.875rem',
+              },
+            },
+          }}
+        >
+          <Table stickyHeader>
             <TableHead>
               <TableRow>
                 <TableCell>Name</TableCell>

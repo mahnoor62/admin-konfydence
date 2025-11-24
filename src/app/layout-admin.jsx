@@ -136,11 +136,17 @@ export default function AdminLayout({ children }) {
       >
         <Toolbar>
           <IconButton
-            color="inherit"
             aria-label="open drawer"
             edge="start"
             onClick={handleDrawerToggle}
-            sx={{ mr: 2, display: { sm: 'none' } }}
+            sx={{ 
+              mr: 2, 
+              display: { sm: 'none' },
+              color: '#1976d2',
+              '&:hover': {
+                backgroundColor: 'rgba(25, 118, 210, 0.08)',
+              }
+            }}
           >
             <MenuIcon />
           </IconButton>
@@ -208,12 +214,16 @@ export default function AdminLayout({ children }) {
         component="main"
         sx={{
           flexGrow: 1,
-          p: 3,
+          p: { xs: 1, sm: 3 },
           width: { sm: `calc(100% - ${drawerWidth}px)` },
           mt: 8,
+          overflow: 'hidden',
+          maxWidth: '100%',
         }}
       >
-        {children}
+        <Box sx={{ width: '100%', overflow: 'hidden' }}>
+          {children}
+        </Box>
       </Box>
     </Box>
   );
