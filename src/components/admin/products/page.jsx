@@ -765,6 +765,7 @@ import {
   InputLabel,
   OutlinedInput,
   Chip,
+  CircularProgress,
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -798,13 +799,18 @@ function getAuthHeaders(extraHeaders = {}) {
 
 function ProductsContent() {
   const [products, setProducts] = useState([]);
+  const [loadingProducts, setLoadingProducts] = useState(false);
   const [productTypes, setProductTypes] = useState([]);
   const [badges, setBadges] = useState([]);
   const [open, setOpen] = useState(false);
   const [typeDialogOpen, setTypeDialogOpen] = useState(false);
   const [badgeDialogOpen, setBadgeDialogOpen] = useState(false);
+  const [badgeDeleteDialogOpen, setBadgeDeleteDialogOpen] = useState(false);
+  const [typeDeleteDialogOpen, setTypeDeleteDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [productToDelete, setProductToDelete] = useState(null);
+  const [typeToDelete, setTypeToDelete] = useState(null);
+  const [badgeToDelete, setBadgeToDelete] = useState(null);
   const [editing, setEditing] = useState(null);
   const fileInputRef = useRef(null);
   const [uploadingImage, setUploadingImage] = useState(false);
@@ -857,6 +863,7 @@ function ProductsContent() {
 
   const fetchProducts = async () => {
     try {
+      setLoadingProducts(true);
       const headers = getAuthHeaders({
         'Cache-Control': 'no-store',
         Pragma: 'no-cache',
@@ -881,6 +888,8 @@ function ProductsContent() {
         status: error.response?.status,
       });
       setProducts([]);
+    } finally {
+      setLoadingProducts(false);
     }
   };
   const fetchProductTypes = async () => {
@@ -1037,6 +1046,44 @@ function ProductsContent() {
     setTypeDialogOpen(false);
   };
 
+  const handleTypeDeleteClick = (type) => {
+    setTypeToDelete(type);
+    setTypeDeleteDialogOpen(true);
+  };
+
+  const handleTypeDeleteCancel = () => {
+    setTypeDeleteDialogOpen(false);
+    setTypeToDelete(null);
+  };
+
+  const handleTypeDeleteConfirm = async () => {
+    if (!typeToDelete?._id) {
+      return;
+    }
+    try {
+      const headers = getAuthHeaders();
+      const url = `${API_URL}/product-types/${typeToDelete._id}`;
+      console.log('📡 API: DELETE', url);
+      await axios.delete(url, { headers });
+      setSnackbar({
+        open: true,
+        message: 'Product type deleted successfully',
+        severity: 'success',
+      });
+      const deletedSlug = typeToDelete.slug;
+      handleTypeDeleteCancel();
+      setFormData((prev) => (prev.type === deletedSlug ? { ...prev, type: '' } : prev));
+      // Re-fetch to sync select list + default selection
+      await fetchProductTypes();
+    } catch (error) {
+      setSnackbar({
+        open: true,
+        message: error.response?.data?.error || 'Error deleting product type',
+        severity: 'error',
+      });
+    }
+  };
+
   const handleTypeSubmit = async () => {
     try {
       if (!typeFormData.name.trim()) {
@@ -1076,6 +1123,44 @@ function ProductsContent() {
 
   const handleBadgeDialogClose = () => {
     setBadgeDialogOpen(false);
+  };
+
+  const handleBadgeDeleteClick = (badge) => {
+    setBadgeToDelete(badge);
+    setBadgeDeleteDialogOpen(true);
+  };
+
+  const handleBadgeDeleteCancel = () => {
+    setBadgeDeleteDialogOpen(false);
+    setBadgeToDelete(null);
+  };
+
+  const handleBadgeDeleteConfirm = async () => {
+    if (!badgeToDelete?._id) return;
+    try {
+      const headers = getAuthHeaders();
+      const url = `${API_URL}/badges/${badgeToDelete._id}`;
+      console.log('📡 API: DELETE', url);
+      await axios.delete(url, { headers });
+      const deletedSlug = badgeToDelete.slug;
+      handleBadgeDeleteCancel();
+      setFormData((prev) => ({
+        ...prev,
+        badges: prev.badges.filter((slug) => slug !== deletedSlug),
+      }));
+      await fetchBadges();
+      setSnackbar({
+        open: true,
+        message: 'Badge deleted successfully',
+        severity: 'success',
+      });
+    } catch (error) {
+      setSnackbar({
+        open: true,
+        message: error.response?.data?.error || 'Error deleting badge',
+        severity: 'error',
+      });
+    }
   };
 
   const handleBadgeSubmit = async () => {
@@ -1329,7 +1414,6 @@ function ProductsContent() {
               bgcolor: 'primary.main',
               '&:hover': {
                 bgcolor: 'primary.dark',
-                transform: 'translateY(-2px)',
                 boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
               },
               transition: 'all 0.3s ease',
@@ -1372,7 +1456,13 @@ function ProductsContent() {
               </TableRow>
             </TableHead>
             <TableBody>
-              {products.length === 0 ? (
+              {loadingProducts ? (
+                <TableRow>
+                  <TableCell colSpan={6} align="center" sx={{ py: 5 }}>
+                    <CircularProgress size={32} />
+                  </TableCell>
+                </TableRow>
+              ) : products.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
                     <Typography variant="body2" color="text.secondary">
@@ -1672,12 +1762,83 @@ function ProductsContent() {
                 placeholder="e.g., Starter, Bundle, Membership"
                 autoFocus
               />
+              <Box sx={{ mt: 1 }}>
+                <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                  Existing Types
+                </Typography>
+                {productTypes.length === 0 ? (
+                  <Typography variant="body2" color="text.secondary">
+                    No product types yet.
+                  </Typography>
+                ) : (
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 1,
+                      maxHeight: 200,
+                      overflowY: 'auto',
+                    }}
+                  >
+                    {productTypes.map((type) => (
+                      <Box
+                        key={type._id}
+                        sx={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          border: '1px solid',
+                          borderColor: 'divider',
+                          borderRadius: 1,
+                          px: 1.5,
+                          py: 1,
+                        }}
+                      >
+                        <Typography>{type.name}</Typography>
+                        <IconButton
+                          size="small"
+                          color="error"
+                          onClick={() => handleTypeDeleteClick(type)}
+                        >
+                          <DeleteIcon fontSize="small" />
+                        </IconButton>
+                      </Box>
+                    ))}
+                  </Box>
+                )}
+              </Box>
             </Box>
           </DialogContent>
           <DialogActions>
             <Button onClick={handleTypeDialogClose}>Cancel</Button>
             <Button onClick={handleTypeSubmit} variant="contained">
               Create Type
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* Delete Type Dialog */}
+        <Dialog
+          open={typeDeleteDialogOpen}
+          onClose={handleTypeDeleteCancel}
+          maxWidth="sm"
+          fullWidth
+        >
+          <DialogTitle>Delete Product Type</DialogTitle>
+          <DialogContent>
+            <Typography>
+              Delete &ldquo;{typeToDelete?.name}&rdquo;? This will permanently
+              remove the product type from the database.
+            </Typography>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={handleTypeDeleteCancel}>Cancel</Button>
+            <Button
+              onClick={handleTypeDeleteConfirm}
+              variant="contained"
+              color="error"
+            >
+              Delete
             </Button>
           </DialogActions>
         </Dialog>
@@ -1710,12 +1871,83 @@ function ProductsContent() {
                 placeholder="e.g., New, Best Seller, Featured"
                 autoFocus
               />
+              <Box sx={{ mt: 1 }}>
+                <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                  Existing Badges
+                </Typography>
+                {badges.length === 0 ? (
+                  <Typography variant="body2" color="text.secondary">
+                    No badges yet.
+                  </Typography>
+                ) : (
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 1,
+                      maxHeight: 200,
+                      overflowY: 'auto',
+                    }}
+                  >
+                    {badges.map((badge) => (
+                      <Box
+                        key={badge._id}
+                        sx={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          border: '1px solid',
+                          borderColor: 'divider',
+                          borderRadius: 1,
+                          px: 1.5,
+                          py: 1,
+                        }}
+                      >
+                        <Typography>{badge.name}</Typography>
+                        <IconButton
+                          size="small"
+                          color="error"
+                          onClick={() => handleBadgeDeleteClick(badge)}
+                        >
+                          <DeleteIcon fontSize="small" />
+                        </IconButton>
+                      </Box>
+                    ))}
+                  </Box>
+                )}
+              </Box>
             </Box>
           </DialogContent>
           <DialogActions>
             <Button onClick={handleBadgeDialogClose}>Cancel</Button>
             <Button onClick={handleBadgeSubmit} variant="contained">
               Create Badge
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* Delete Badge Dialog */}
+        <Dialog
+          open={badgeDeleteDialogOpen}
+          onClose={handleBadgeDeleteCancel}
+          maxWidth="sm"
+          fullWidth
+        >
+          <DialogTitle>Delete Badge</DialogTitle>
+          <DialogContent>
+            <Typography>
+              Delete &ldquo;{badgeToDelete?.name}&rdquo;? This will remove the
+              badge from the database and any products using it.
+            </Typography>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={handleBadgeDeleteCancel}>Cancel</Button>
+            <Button
+              onClick={handleBadgeDeleteConfirm}
+              variant="contained"
+              color="error"
+            >
+              Delete
             </Button>
           </DialogActions>
         </Dialog>

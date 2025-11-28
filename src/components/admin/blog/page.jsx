@@ -767,6 +767,7 @@ import {
   FormControl,
   InputLabel,
   OutlinedInput,
+  CircularProgress,
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -821,13 +822,18 @@ function getAuthHeaders(extraHeaders = {}) {
 
 function BlogContent() {
   const [posts, setPosts] = useState([]);
+  const [loadingPosts, setLoadingPosts] = useState(false);
   const [categories, setCategories] = useState([]);
   const [tags, setTags] = useState([]);
   const [open, setOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
   const [tagDialogOpen, setTagDialogOpen] = useState(false);
+  const [categoryDeleteDialogOpen, setCategoryDeleteDialogOpen] = useState(false);
+  const [tagDeleteDialogOpen, setTagDeleteDialogOpen] = useState(false);
   const [postToDelete, setPostToDelete] = useState(null);
+  const [categoryToDelete, setCategoryToDelete] = useState(null);
+  const [tagToDelete, setTagToDelete] = useState(null);
   const [editing, setEditing] = useState(null);
   const fileInputRef = useRef(null);
   const [uploadingImage, setUploadingImage] = useState(false);
@@ -875,6 +881,7 @@ function BlogContent() {
   // };
   const fetchPosts = async () => {
     try {
+      setLoadingPosts(true);
       const headers = getAuthHeaders();
       const url = `${API_URL}/blog`;
       const params = { all: true, _t: Date.now() }; // 🔥 anti-cache param
@@ -898,6 +905,8 @@ function BlogContent() {
         errorMessage = error.response.data.error;
       }
       setSnackbar({ open: true, message: errorMessage, severity: 'error' });
+    } finally {
+      setLoadingPosts(false);
     }
   };
   
@@ -1148,6 +1157,45 @@ function BlogContent() {
     setCategoryDialogOpen(false);
   };
 
+  const handleCategoryDeleteClick = (category) => {
+    setCategoryToDelete(category);
+    setCategoryDeleteDialogOpen(true);
+  };
+
+  const handleCategoryDeleteCancel = () => {
+    setCategoryDeleteDialogOpen(false);
+    setCategoryToDelete(null);
+  };
+
+  const handleCategoryDeleteConfirm = async () => {
+    if (!categoryToDelete?._id) return;
+    try {
+      const headers = getAuthHeaders();
+      const url = `${API_URL}/blog-categories/${categoryToDelete._id}`;
+      console.log('📡 API: DELETE', url);
+      await axios.delete(url, { headers });
+      const deletedSlug = categoryToDelete.slug;
+      handleCategoryDeleteCancel();
+      setFormData((prev) => ({
+        ...prev,
+        category: prev.category === deletedSlug ? '' : prev.category,
+      }));
+      await fetchCategories();
+      setSnackbar({
+        open: true,
+        message: 'Category deleted successfully',
+        severity: 'success',
+      });
+    } catch (error) {
+      setSnackbar({
+        open: true,
+        message:
+          error.response?.data?.error || 'Error deleting category',
+        severity: 'error',
+      });
+    }
+  };
+
   const handleCategorySubmit = async () => {
     try {
       if (!categoryFormData.name.trim()) {
@@ -1187,6 +1235,44 @@ function BlogContent() {
 
   const handleTagDialogClose = () => {
     setTagDialogOpen(false);
+  };
+
+  const handleTagDeleteClick = (tag) => {
+    setTagToDelete(tag);
+    setTagDeleteDialogOpen(true);
+  };
+
+  const handleTagDeleteCancel = () => {
+    setTagDeleteDialogOpen(false);
+    setTagToDelete(null);
+  };
+
+  const handleTagDeleteConfirm = async () => {
+    if (!tagToDelete?._id) return;
+    try {
+      const headers = getAuthHeaders();
+      const url = `${API_URL}/blog-tags/${tagToDelete._id}`;
+      console.log('📡 API: DELETE', url);
+      await axios.delete(url, { headers });
+      const deletedSlug = tagToDelete.slug;
+      handleTagDeleteCancel();
+      setFormData((prev) => ({
+        ...prev,
+        tags: prev.tags.filter((slug) => slug !== deletedSlug),
+      }));
+      await fetchTags();
+      setSnackbar({
+        open: true,
+        message: 'Tag deleted successfully',
+        severity: 'success',
+      });
+    } catch (error) {
+      setSnackbar({
+        open: true,
+        message: error.response?.data?.error || 'Error deleting tag',
+        severity: 'error',
+      });
+    }
   };
 
   const handleTagSubmit = async () => {
@@ -1287,7 +1373,6 @@ function BlogContent() {
             bgcolor: 'primary.main',
             '&:hover': {
               bgcolor: 'primary.dark',
-              transform: 'translateY(-2px)',
               boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
             },
             transition: 'all 0.3s ease',
@@ -1330,7 +1415,13 @@ function BlogContent() {
             </TableRow>
           </TableHead>
           <TableBody>
-            {posts.length === 0 ? (
+            {loadingPosts ? (
+              <TableRow>
+                <TableCell colSpan={6} align="center" sx={{ py: 5 }}>
+                  <CircularProgress size={32} />
+                </TableCell>
+              </TableRow>
+            ) : posts.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
                   <Typography variant="body2" color="text.secondary">
@@ -1662,6 +1753,51 @@ function BlogContent() {
               placeholder="e.g., Insight, Technique, Guide"
               autoFocus
             />
+            <Box sx={{ mt: 1 }}>
+              <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                Existing Categories
+              </Typography>
+              {categories.length === 0 ? (
+                <Typography variant="body2" color="text.secondary">
+                  No categories yet.
+                </Typography>
+              ) : (
+                <Box
+                  sx={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 1,
+                    maxHeight: 200,
+                    overflowY: 'auto',
+                  }}
+                >
+                  {categories.map((category) => (
+                    <Box
+                      key={category._id}
+                      sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        border: '1px solid',
+                        borderColor: 'divider',
+                        borderRadius: 1,
+                        px: 1.5,
+                        py: 1,
+                      }}
+                    >
+                      <Typography>{category.name}</Typography>
+                      <IconButton
+                        size="small"
+                        color="error"
+                        onClick={() => handleCategoryDeleteClick(category)}
+                      >
+                        <DeleteIcon fontSize="small" />
+                      </IconButton>
+                    </Box>
+                  ))}
+                </Box>
+              )}
+            </Box>
           </Box>
         </DialogContent>
         <DialogActions>
@@ -1700,12 +1836,109 @@ function BlogContent() {
               placeholder="e.g., Security, Awareness, Training"
               autoFocus
             />
+            <Box sx={{ mt: 1 }}>
+              <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                Existing Tags
+              </Typography>
+              {tags.length === 0 ? (
+                <Typography variant="body2" color="text.secondary">
+                  No tags yet.
+                </Typography>
+              ) : (
+                <Box
+                  sx={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 1,
+                    maxHeight: 200,
+                    overflowY: 'auto',
+                  }}
+                >
+                  {tags.map((tag) => (
+                    <Box
+                      key={tag._id}
+                      sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        border: '1px solid',
+                        borderColor: 'divider',
+                        borderRadius: 1,
+                        px: 1.5,
+                        py: 1,
+                      }}
+                    >
+                      <Typography>{tag.name}</Typography>
+                      <IconButton
+                        size="small"
+                        color="error"
+                        onClick={() => handleTagDeleteClick(tag)}
+                      >
+                        <DeleteIcon fontSize="small" />
+                      </IconButton>
+                    </Box>
+                  ))}
+                </Box>
+              )}
+            </Box>
           </Box>
         </DialogContent>
         <DialogActions>
           <Button onClick={handleTagDialogClose}>Cancel</Button>
           <Button onClick={handleTagSubmit} variant="contained">
             Create Tag
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Delete Category Dialog */}
+      <Dialog
+        open={categoryDeleteDialogOpen}
+        onClose={handleCategoryDeleteCancel}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Delete Category</DialogTitle>
+        <DialogContent>
+          <Typography>
+            Delete &ldquo;{categoryToDelete?.name}&rdquo;? This will remove the
+            category from the database.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCategoryDeleteCancel}>Cancel</Button>
+          <Button
+            onClick={handleCategoryDeleteConfirm}
+            variant="contained"
+            color="error"
+          >
+            Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Delete Tag Dialog */}
+      <Dialog
+        open={tagDeleteDialogOpen}
+        onClose={handleTagDeleteCancel}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Delete Tag</DialogTitle>
+        <DialogContent>
+          <Typography>
+            Delete &ldquo;{tagToDelete?.name}&rdquo;? This will remove the tag
+            from the database and any assigned posts.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleTagDeleteCancel}>Cancel</Button>
+          <Button
+            onClick={handleTagDeleteConfirm}
+            variant="contained"
+            color="error"
+          >
+            Delete
           </Button>
         </DialogActions>
       </Dialog>

@@ -24,6 +24,7 @@ import {
   FormControlLabel,
   Snackbar,
   Alert,
+  CircularProgress,
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -51,6 +52,7 @@ function getAuthHeaders() {
 
 function TestimonialsContent() {
   const [testimonials, setTestimonials] = useState([]);
+  const [loadingTestimonials, setLoadingTestimonials] = useState(false);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [formData, setFormData] = useState({
@@ -69,6 +71,7 @@ function TestimonialsContent() {
 
   const fetchTestimonials = async () => {
     try {
+      setLoadingTestimonials(true);
       const headers = getAuthHeaders();
       const url = `${API_URL}/testimonials`;
       console.log('📡 API: GET', url);
@@ -82,6 +85,8 @@ function TestimonialsContent() {
         status: error.response?.status,
       });
       setTestimonials([]);
+    } finally {
+      setLoadingTestimonials(false);
     }
   };
 
@@ -173,7 +178,6 @@ function TestimonialsContent() {
             bgcolor: 'primary.main',
             '&:hover': {
               bgcolor: 'primary.dark',
-              transform: 'translateY(-2px)',
               boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
             },
             transition: 'all 0.3s ease',
@@ -196,7 +200,13 @@ function TestimonialsContent() {
             </TableRow>
           </TableHead>
           <TableBody>
-            {testimonials.length === 0 ? (
+            {loadingTestimonials ? (
+              <TableRow>
+                <TableCell colSpan={6} align="center" sx={{ py: 5 }}>
+                  <CircularProgress size={32} />
+                </TableCell>
+              </TableRow>
+            ) : testimonials.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
                   <Typography variant="body2" color="text.secondary">

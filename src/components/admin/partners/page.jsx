@@ -371,7 +371,7 @@
 'use client';
 export const dynamic = 'force-dynamic';
 import AdminLayout from '@/components/AdminLayout';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Box,
   Typography,
@@ -394,6 +394,7 @@ import {
   FormControlLabel,
   Snackbar,
   Alert,
+  CircularProgress,
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -441,17 +442,26 @@ function getAuthHeaders(extraHeaders = {}) {
 
 function PartnersContent() {
   const [partners, setPartners] = useState([]);
+  const [loadingPartners, setLoadingPartners] = useState(false);
+  const [partnerTypes, setPartnerTypes] = useState([]);
+  const fileInputRef = useRef(null);
   const [open, setOpen] = useState(false);
+  const [typeDialogOpen, setTypeDialogOpen] = useState(false);
+  const [typeDeleteDialogOpen, setTypeDeleteDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [partnerToDelete, setPartnerToDelete] = useState(null);
+  const [typeToDelete, setTypeToDelete] = useState(null);
   const [editing, setEditing] = useState(null);
+  const [editingType, setEditingType] = useState(null);
   const [formData, setFormData] = useState({
     name: '',
     logoUrl: '',
     linkUrl: '',
-    type: 'partner',
+    type: '',
     isActive: true,
   });
+  const [typeFormData, setTypeFormData] = useState({ name: '' });
+  const [uploadingImage, setUploadingImage] = useState(false);
   const [snackbar, setSnackbar] = useState({
     open: false,
     message: '',
@@ -460,6 +470,7 @@ function PartnersContent() {
 
   useEffect(() => {
     fetchPartners();
+    fetchPartnerTypes();
   }, []);
 
   // const fetchPartners = async () => {
@@ -489,6 +500,7 @@ function PartnersContent() {
 
   const fetchPartners = async () => {
     try {
+      setLoadingPartners(true);
       const headers = getAuthHeaders();
       const url = `${API_URL}/partners`;
   
@@ -513,6 +525,126 @@ function PartnersContent() {
         message: 'Failed to load partner logos',
         severity: 'error',
       });
+    } finally {
+      setLoadingPartners(false);
+    }
+  };
+
+  const fetchPartnerTypes = async () => {
+    try {
+      const headers = getAuthHeaders();
+      const url = `${API_URL}/partner-types`;
+      const params = { active: 'true', _t: Date.now() };
+      console.log('📡 API: GET', url, params);
+      const res = await axios.get(url, { headers, params });
+      const data = Array.isArray(res.data) ? res.data : [];
+      setPartnerTypes(data);
+      setFormData((prev) => {
+        if (prev.type) return prev;
+        return { ...prev, type: data[0]?.slug || '' };
+      });
+    } catch (error) {
+      console.error('❌ Error fetching partner types:', {
+        url: `${API_URL}/partner-types`,
+        error: error.response?.data || error.message,
+        status: error.response?.status,
+      });
+      setPartnerTypes([]);
+    }
+  };
+
+  const handleTypeDialogOpen = (type = null) => {
+    setEditingType(type);
+    setTypeFormData({ name: type?.name || '' });
+    setTypeDialogOpen(true);
+  };
+
+  const handleTypeDialogClose = () => {
+    setTypeDialogOpen(false);
+    setEditingType(null);
+    setTypeFormData({ name: '' });
+  };
+
+  const handleTypeSubmit = async () => {
+    try {
+      if (!typeFormData.name.trim()) {
+        setSnackbar({
+          open: true,
+          message: 'Please enter a type name',
+          severity: 'error',
+        });
+        return;
+      }
+
+      const headers = getAuthHeaders();
+      const payload = { name: typeFormData.name.trim() };
+
+      if (editingType) {
+        const url = `${API_URL}/partner-types/${editingType._id}`;
+        console.log('📡 API: PUT', url, payload);
+        await axios.put(url, payload, { headers });
+        setSnackbar({
+          open: true,
+          message: 'Partner type updated successfully',
+          severity: 'success',
+        });
+      } else {
+        const url = `${API_URL}/partner-types`;
+        console.log('📡 API: POST', url, payload);
+        await axios.post(url, payload, { headers });
+        setSnackbar({
+          open: true,
+          message: 'Partner type created successfully',
+          severity: 'success',
+        });
+      }
+
+      handleTypeDialogClose();
+      fetchPartnerTypes();
+    } catch (error) {
+      setSnackbar({
+        open: true,
+        message:
+          error.response?.data?.error || 'Error saving partner type',
+        severity: 'error',
+      });
+    }
+  };
+
+  const handleTypeDeleteClick = (type) => {
+    setTypeToDelete(type);
+    setTypeDeleteDialogOpen(true);
+  };
+
+  const handleTypeDeleteCancel = () => {
+    setTypeDeleteDialogOpen(false);
+    setTypeToDelete(null);
+  };
+
+  const handleTypeDeleteConfirm = async () => {
+    if (!typeToDelete) return;
+    try {
+      const headers = getAuthHeaders();
+      const url = `${API_URL}/partner-types/${typeToDelete._id}`;
+      console.log('📡 API: DELETE', url);
+      await axios.delete(url, { headers });
+      setSnackbar({
+        open: true,
+        message: 'Partner type deleted successfully',
+        severity: 'success',
+      });
+      handleTypeDeleteCancel();
+      setFormData((prev) =>
+        prev.type === typeToDelete.slug ? { ...prev, type: '' } : prev
+      );
+      fetchPartnerTypes();
+    } catch (error) {
+      setSnackbar({
+        open: true,
+        message:
+          error.response?.data?.error || 'Error deleting partner type',
+        severity: 'error',
+      });
     }
   };
   
@@ -524,7 +656,7 @@ function PartnersContent() {
         name: partner.name,
         logoUrl: partner.logoUrl,
         linkUrl: partner.linkUrl || '',
-        type: partner.type || 'partner',
+        type: partner.type || partnerTypes[0]?.slug || '',
         isActive: partner.isActive,
       });
     } else {
@@ -533,7 +665,7 @@ function PartnersContent() {
         name: '',
         logoUrl: '',
         linkUrl: '',
-        type: 'partner',
+        type: partnerTypes[0]?.slug || '',
         isActive: true,
       });
     }
@@ -559,7 +691,7 @@ function PartnersContent() {
       if (!formData.logoUrl.trim()) {
         setSnackbar({
           open: true,
-          message: 'Logo URL is required',
+          message: 'Partner logo image is required',
           severity: 'error',
         });
         return;
@@ -658,6 +790,58 @@ function PartnersContent() {
     setPartnerToDelete(null);
   };
 
+  const triggerImagePicker = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleImageUpload = async (event) => {
+    const file =
+      event.target.files && event.target.files.length > 0
+        ? event.target.files[0]
+        : null;
+    if (!file) return;
+
+    const form = new FormData();
+    form.append('file', file);
+
+    try {
+      setUploadingImage(true);
+      const headers = getAuthHeaders({
+        'Content-Type': 'multipart/form-data',
+      });
+      const url = `${API_URL}/uploads`;
+      console.log('📡 API: POST', url, '[FormData]');
+      const res = await axios.post(url, form, { headers });
+      setFormData((prev) => ({
+        ...prev,
+        logoUrl: res.data.url,
+      }));
+      setSnackbar({
+        open: true,
+        message: 'Logo uploaded',
+        severity: 'success',
+      });
+    } catch (error) {
+      console.error('Error uploading logo:', error);
+      setSnackbar({
+        open: true,
+        message: 'Failed to upload logo',
+        severity: 'error',
+      });
+    } finally {
+      setUploadingImage(false);
+      if (event.target) {
+        event.target.value = '';
+      }
+    }
+  };
+
+  const getTypeLabel = (slug) => {
+    if (!slug) return '—';
+    const found = partnerTypes.find((type) => type.slug === slug);
+    return found?.name || slug;
+  };
+
   return (
     <Box>
       <Box
@@ -677,7 +861,6 @@ function PartnersContent() {
             bgcolor: 'primary.main',
             '&:hover': {
               bgcolor: 'primary.dark',
-              transform: 'translateY(-2px)',
               boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
             },
             transition: 'all 0.3s ease',
@@ -719,7 +902,13 @@ function PartnersContent() {
             </TableRow>
           </TableHead>
           <TableBody>
-            {partners.length === 0 ? (
+            {loadingPartners ? (
+              <TableRow>
+                <TableCell colSpan={5} align="center" sx={{ py: 5 }}>
+                  <CircularProgress size={32} />
+                </TableCell>
+              </TableRow>
+            ) : partners.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={5} align="center" sx={{ py: 4 }}>
                   <Typography variant="body2" color="text.secondary">
@@ -732,7 +921,7 @@ function PartnersContent() {
               partners.map((partner) => (
                 <TableRow key={partner._id}>
                   <TableCell>{partner.name}</TableCell>
-                  <TableCell>{partner.type}</TableCell>
+                  <TableCell>{getTypeLabel(partner.type)}</TableCell>
                   <TableCell>
                     {partner.logoUrl ? (
                       <Box
@@ -807,37 +996,86 @@ function PartnersContent() {
                 setFormData({ ...formData, name: e.target.value })
               }
             />
-            <TextField
-              label="Logo URL"
-              fullWidth
-              required
-              value={formData.logoUrl}
-              onChange={(e) =>
-                setFormData({ ...formData, logoUrl: e.target.value })
-              }
-            />
-            <TextField
-              label="Link URL (optional)"
-              fullWidth
-              value={formData.linkUrl}
-              onChange={(e) =>
-                setFormData({ ...formData, linkUrl: e.target.value })
-              }
-            />
-            <TextField
-              select
-              label="Type"
-              fullWidth
-              required
-              value={formData.type}
-              onChange={(e) =>
-                setFormData({ ...formData, type: e.target.value })
-              }
+            <Box
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 2,
+                flexWrap: 'wrap',
+              }}
             >
-              <MenuItem value="press">Press</MenuItem>
-              <MenuItem value="partner">Partner</MenuItem>
-              <MenuItem value="event">Event</MenuItem>
-            </TextField>
+              <Button
+                variant="outlined"
+                onClick={triggerImagePicker}
+                disabled={uploadingImage}
+              >
+                {uploadingImage
+                  ? 'Uploading...'
+                  : formData.logoUrl
+                  ? 'Replace Logo'
+                  : 'Upload Logo'}
+              </Button>
+              {formData.logoUrl && (
+                <Box
+                  component="img"
+                  src={formData.logoUrl}
+                  alt="Logo preview"
+                  sx={{
+                    width: 140,
+                    height: 80,
+                    objectFit: 'contain',
+                    borderRadius: 2,
+                    border: '1px solid rgba(0,0,0,0.1)',
+                    backgroundColor: '#fff',
+                  }}
+                />
+              )}
+              <input
+                type="file"
+                accept="image/*"
+                ref={fileInputRef}
+                style={{ display: 'none' }}
+                onChange={handleImageUpload}
+              />
+            </Box>
+            <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start' }}>
+              <TextField
+                select
+                label="Type"
+                fullWidth
+                required
+                value={formData.type}
+                onChange={(e) =>
+                  setFormData({ ...formData, type: e.target.value })
+                }
+                disabled={partnerTypes.length === 0}
+                helperText={
+                  partnerTypes.length === 0
+                    ? 'Create a partner type before adding logos'
+                    : undefined
+                }
+              >
+                {partnerTypes.length === 0 ? (
+                  <MenuItem value="" disabled>
+                    No partner types available
+                  </MenuItem>
+                ) : (
+                  partnerTypes.map((type) => (
+                    <MenuItem key={type._id} value={type.slug}>
+                      {type.name}
+                    </MenuItem>
+                  ))
+                )}
+              </TextField>
+              <Button
+                variant="outlined"
+                startIcon={<AddIcon />}
+                onClick={() => handleTypeDialogOpen()}
+                sx={{ mt: 1, whiteSpace: 'nowrap' }}
+              >
+                Manage Types
+              </Button>
+            </Box>
             <FormControlLabel
               control={
                 <Switch
@@ -858,6 +1096,126 @@ function PartnersContent() {
           <Button onClick={handleClose}>Cancel</Button>
           <Button onClick={handleSubmit} variant="contained">
             {editing ? 'Update' : 'Create'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Partner Type Dialog */}
+      <Dialog
+        open={typeDialogOpen}
+        onClose={handleTypeDialogClose}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>
+          {editingType ? 'Edit Partner Type' : 'Add Partner Type'}
+        </DialogTitle>
+        <DialogContent>
+          <Box
+            sx={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 2,
+              pt: 2,
+            }}
+          >
+            <TextField
+              label="Type Name"
+              fullWidth
+              required
+              value={typeFormData.name}
+              onChange={(e) =>
+                setTypeFormData({ name: e.target.value })
+              }
+              placeholder="e.g., Partner, Event, Press"
+              autoFocus
+            />
+            <Box sx={{ mt: 1 }}>
+              <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                Existing Types
+              </Typography>
+              {partnerTypes.length === 0 ? (
+                <Typography variant="body2" color="text.secondary">
+                  No partner types yet.
+                </Typography>
+              ) : (
+                <Box
+                  sx={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 1,
+                    maxHeight: 240,
+                    overflowY: 'auto',
+                  }}
+                >
+                  {partnerTypes.map((type) => (
+                    <Box
+                      key={type._id}
+                      sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        border: '1px solid',
+                        borderColor: 'divider',
+                        borderRadius: 1,
+                        px: 1.5,
+                        py: 1,
+                      }}
+                    >
+                      <Typography>{type.name}</Typography>
+                      <Box>
+                        <IconButton
+                          size="small"
+                          onClick={() => handleTypeDialogOpen(type)}
+                        >
+                          <EditIcon fontSize="small" />
+                        </IconButton>
+                        <IconButton
+                          size="small"
+                          color="error"
+                          onClick={() => handleTypeDeleteClick(type)}
+                        >
+                          <DeleteIcon fontSize="small" />
+                        </IconButton>
+                      </Box>
+                    </Box>
+                  ))}
+                </Box>
+              )}
+            </Box>
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleTypeDialogClose}>Cancel</Button>
+          <Button onClick={handleTypeSubmit} variant="contained">
+            {editingType ? 'Update Type' : 'Create Type'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Delete Type Dialog */}
+      <Dialog
+        open={typeDeleteDialogOpen}
+        onClose={handleTypeDeleteCancel}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Delete Partner Type</DialogTitle>
+        <DialogContent>
+          <Typography>
+            Delete &ldquo;{typeToDelete?.name}&rdquo;? This will remove the
+            type from the database. Existing logos using it will display the
+            raw slug until reassigned.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleTypeDeleteCancel}>Cancel</Button>
+          <Button
+            onClick={handleTypeDeleteConfirm}
+            variant="contained"
+            color="error"
+          >
+            Delete
           </Button>
         </DialogActions>
       </Dialog>
