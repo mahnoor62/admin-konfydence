@@ -819,36 +819,34 @@ function getAuthHeaders(extraHeaders = {}) {
   return headers;
 }
 
+// Fixed category enum matching frontend
+const CATEGORY_OPTIONS = [
+  { label: 'For families', value: 'for-families' },
+  { label: 'For companies', value: 'for-companies' },
+  { label: 'For schools', value: 'for-schools' },
+  { label: 'News', value: 'news' },
+  { label: 'How-to', value: 'how-to' },
+];
 
 function BlogContent() {
   const [posts, setPosts] = useState([]);
   const [loadingPosts, setLoadingPosts] = useState(false);
-  const [categories, setCategories] = useState([]);
-  const [tags, setTags] = useState([]);
   const [open, setOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
-  const [tagDialogOpen, setTagDialogOpen] = useState(false);
-  const [categoryDeleteDialogOpen, setCategoryDeleteDialogOpen] = useState(false);
-  const [tagDeleteDialogOpen, setTagDeleteDialogOpen] = useState(false);
   const [postToDelete, setPostToDelete] = useState(null);
-  const [categoryToDelete, setCategoryToDelete] = useState(null);
-  const [tagToDelete, setTagToDelete] = useState(null);
   const [editing, setEditing] = useState(null);
   const fileInputRef = useRef(null);
   const [uploadingImage, setUploadingImage] = useState(false);
+
   const [formData, setFormData] = useState({
     title: '',
     slug: '',
     excerpt: '',
     content: '',
     featuredImage: '',
-    tags: [],
-    category: '',
+    category: 'news',
     isPublished: false,
   });
-  const [categoryFormData, setCategoryFormData] = useState({ name: '' });
-  const [tagFormData, setTagFormData] = useState({ name: '' });
   const [snackbar, setSnackbar] = useState({
     open: false,
     message: '',
@@ -911,53 +909,9 @@ function BlogContent() {
   };
   
 
-  const fetchCategories = async () => {
-    try {
-      const headers = getAuthHeaders();
-      const url = `${API_URL}/blog-categories`;
-      const params = { active: 'true', _t: Date.now() };
-      console.log('📡 API: GET', url, params);
-      const res = await axios.get(url, { headers, params });
-      const data = Array.isArray(res.data) ? res.data : [];
-      setCategories(data);
-      if (data.length > 0) {
-        setFormData((prev) => {
-          if (prev.category) return prev;
-          return { ...prev, category: data[0].slug };
-        });
-      }
-    } catch (error) {
-      console.error('❌ Error fetching categories:', {
-        url: `${API_URL}/blog-categories`,
-        error: error.response?.data || error.message,
-        status: error.response?.status,
-      });
-    }
-  };
-
-  const fetchTags = async () => {
-    try {
-      const headers = getAuthHeaders();
-      const url = `${API_URL}/blog-tags`;
-      const params = { active: 'true', _t: Date.now() };
-      console.log('📡 API: GET', url, params);
-      const res = await axios.get(url, { headers, params });
-      const data = Array.isArray(res.data) ? res.data : [];
-      setTags(data);
-    } catch (error) {
-      console.error('❌ Error fetching tags:', {
-        url: `${API_URL}/blog-tags`,
-        error: error.response?.data || error.message,
-        status: error.response?.status,
-      });
-    }
-  };
-
   useEffect(() => {
     // sirf mount pe run hoga
     fetchPosts();
-    fetchCategories();
-    fetchTags();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -966,22 +920,13 @@ function BlogContent() {
   const handleOpen = (post) => {
     if (post) {
       setEditing(post);
-      // Map tags to slugs
-      const tagSlugs = (post.tags || [])
-        .map((tag) => {
-          const foundTag = tags.find((t) => t.slug === tag || t.name === tag);
-          return foundTag ? foundTag.slug : tag;
-        })
-        .filter(Boolean);
-
       setFormData({
         title: post.title,
         slug: post.slug,
         excerpt: post.excerpt,
         content: post.content,
         featuredImage: post.featuredImage || '',
-        tags: tagSlugs,
-        category: post.category,
+        category: post.category || 'news',
         isPublished: post.isPublished,
       });
     } else {
@@ -992,8 +937,7 @@ function BlogContent() {
         excerpt: '',
         content: '',
         featuredImage: '',
-        tags: [],
-        category: categories.length > 0 ? categories[0].slug : '',
+        category: 'news',
         isPublished: false,
       });
     }
@@ -1041,7 +985,7 @@ function BlogContent() {
         });
         return;
       }
-      if (!formData.category) {
+      if (!formData.category || !CATEGORY_OPTIONS.find(opt => opt.value === formData.category)) {
         setSnackbar({
           open: true,
           message: 'Post category is required',
@@ -1148,163 +1092,6 @@ function BlogContent() {
     setPostToDelete(null);
   };
 
-  const handleCategoryDialogOpen = () => {
-    setCategoryFormData({ name: '' });
-    setCategoryDialogOpen(true);
-  };
-
-  const handleCategoryDialogClose = () => {
-    setCategoryDialogOpen(false);
-  };
-
-  const handleCategoryDeleteClick = (category) => {
-    setCategoryToDelete(category);
-    setCategoryDeleteDialogOpen(true);
-  };
-
-  const handleCategoryDeleteCancel = () => {
-    setCategoryDeleteDialogOpen(false);
-    setCategoryToDelete(null);
-  };
-
-  const handleCategoryDeleteConfirm = async () => {
-    if (!categoryToDelete?._id) return;
-    try {
-      const headers = getAuthHeaders();
-      const url = `${API_URL}/blog-categories/${categoryToDelete._id}`;
-      console.log('📡 API: DELETE', url);
-      await axios.delete(url, { headers });
-      const deletedSlug = categoryToDelete.slug;
-      handleCategoryDeleteCancel();
-      setFormData((prev) => ({
-        ...prev,
-        category: prev.category === deletedSlug ? '' : prev.category,
-      }));
-      await fetchCategories();
-      setSnackbar({
-        open: true,
-        message: 'Category deleted successfully',
-        severity: 'success',
-      });
-    } catch (error) {
-      setSnackbar({
-        open: true,
-        message:
-          error.response?.data?.error || 'Error deleting category',
-        severity: 'error',
-      });
-    }
-  };
-
-  const handleCategorySubmit = async () => {
-    try {
-      if (!categoryFormData.name.trim()) {
-        setSnackbar({
-          open: true,
-          message: 'Please enter a category name',
-          severity: 'error',
-        });
-        return;
-      }
-      const headers = getAuthHeaders();
-      const url = `${API_URL}/blog-categories`;
-      const payload = { name: categoryFormData.name.trim() };
-      console.log('📡 API: POST', url, payload);
-      await axios.post(url, payload, { headers });
-      setSnackbar({
-        open: true,
-        message: 'Category created successfully',
-        severity: 'success',
-      });
-      handleCategoryDialogClose();
-      fetchCategories();
-    } catch (error) {
-      setSnackbar({
-        open: true,
-        message:
-          error.response?.data?.error || 'Error creating category',
-        severity: 'error',
-      });
-    }
-  };
-
-  const handleTagDialogOpen = () => {
-    setTagFormData({ name: '' });
-    setTagDialogOpen(true);
-  };
-
-  const handleTagDialogClose = () => {
-    setTagDialogOpen(false);
-  };
-
-  const handleTagDeleteClick = (tag) => {
-    setTagToDelete(tag);
-    setTagDeleteDialogOpen(true);
-  };
-
-  const handleTagDeleteCancel = () => {
-    setTagDeleteDialogOpen(false);
-    setTagToDelete(null);
-  };
-
-  const handleTagDeleteConfirm = async () => {
-    if (!tagToDelete?._id) return;
-    try {
-      const headers = getAuthHeaders();
-      const url = `${API_URL}/blog-tags/${tagToDelete._id}`;
-      console.log('📡 API: DELETE', url);
-      await axios.delete(url, { headers });
-      const deletedSlug = tagToDelete.slug;
-      handleTagDeleteCancel();
-      setFormData((prev) => ({
-        ...prev,
-        tags: prev.tags.filter((slug) => slug !== deletedSlug),
-      }));
-      await fetchTags();
-      setSnackbar({
-        open: true,
-        message: 'Tag deleted successfully',
-        severity: 'success',
-      });
-    } catch (error) {
-      setSnackbar({
-        open: true,
-        message: error.response?.data?.error || 'Error deleting tag',
-        severity: 'error',
-      });
-    }
-  };
-
-  const handleTagSubmit = async () => {
-    try {
-      if (!tagFormData.name.trim()) {
-        setSnackbar({
-          open: true,
-          message: 'Please enter a tag name',
-          severity: 'error',
-        });
-        return;
-      }
-      const headers = getAuthHeaders();
-      const url = `${API_URL}/blog-tags`;
-      const payload = { name: tagFormData.name.trim() };
-      console.log('📡 API: POST', url, payload);
-      await axios.post(url, payload, { headers });
-      setSnackbar({
-        open: true,
-        message: 'Tag created successfully',
-        severity: 'success',
-      });
-      handleTagDialogClose();
-      fetchTags();
-    } catch (error) {
-      setSnackbar({
-        open: true,
-        message: error.response?.data?.error || 'Error creating tag',
-        severity: 'error',
-      });
-    }
-  };
 
   const triggerImagePicker = () => {
     if (fileInputRef.current) {
@@ -1467,7 +1254,10 @@ function BlogContent() {
                   </TableCell>
                   <TableCell>{post.title}</TableCell>
                   <TableCell>
-                    <Chip label={post.category} size="small" />
+                    <Chip 
+                      label={CATEGORY_OPTIONS.find(opt => opt.value === post.category)?.label || post.category} 
+                      size="small" 
+                    />
                   </TableCell>
                   <TableCell>
                     <Chip
@@ -1598,82 +1388,43 @@ function BlogContent() {
               />
             </Box>
 
-            {/* Category + Add Category */}
-            <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start' }}>
-              <TextField
-                select
-                label="Category"
-                fullWidth
-                required
+            {/* Category Dropdown - Fixed Enum */}
+            <FormControl fullWidth required>
+              <InputLabel id="category-select-label">Category</InputLabel>
+              <Select
+                labelId="category-select-label"
                 value={formData.category}
                 onChange={(e) =>
                   setFormData({ ...formData, category: e.target.value })
                 }
+                label="Category"
+                MenuProps={{
+                  PaperProps: {
+                    sx: {
+                      maxHeight: 300,
+                      mt: 1,
+                      boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
+                    },
+                  },
+                  anchorOrigin: {
+                    vertical: 'bottom',
+                    horizontal: 'left',
+                  },
+                  transformOrigin: {
+                    vertical: 'top',
+                    horizontal: 'left',
+                  },
+                  disablePortal: false,
+                  disableScrollLock: true,
+                }}
               >
-                {categories.map((category) => (
-                  <MenuItem key={category._id} value={category.slug}>
-                    {category.name}
+                {CATEGORY_OPTIONS.map((option) => (
+                  <MenuItem key={option.value} value={option.value}>
+                    {option.label}
                   </MenuItem>
                 ))}
-              </TextField>
-              <Button
-                variant="outlined"
-                startIcon={<AddIcon />}
-                onClick={handleCategoryDialogOpen}
-                sx={{ mt: 1, whiteSpace: 'nowrap' }}
-              >
-                Add Category
-              </Button>
-            </Box>
-
-            {/* Tags + Add Tag */}
-            <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start' }}>
-              <FormControl fullWidth>
-                <InputLabel>Tags</InputLabel>
-                <Select
-                  multiple
-                  value={formData.tags}
-                  onChange={(e) =>
-                    setFormData({ ...formData, tags: e.target.value })
-                  }
-                  input={<OutlinedInput label="Tags" />}
-                  renderValue={(selected) => (
-                    <Box
-                      sx={{
-                        display: 'flex',
-                        flexWrap: 'wrap',
-                        gap: 0.5,
-                      }}
-                    >
-                      {selected.map((value) => {
-                        const tag = tags.find((t) => t.slug === value);
-                        return (
-                          <Chip
-                            key={value}
-                            label={tag?.name || value}
-                            size="small"
-                          />
-                        );
-                      })}
-                    </Box>
-                  )}
-                >
-                  {tags.map((tag) => (
-                    <MenuItem key={tag._id} value={tag.slug}>
-                      {tag.name}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-              <Button
-                variant="outlined"
-                startIcon={<AddIcon />}
-                onClick={handleTagDialogOpen}
-                sx={{ mt: 1, whiteSpace: 'nowrap' }}
-              >
-                Add Tag
-              </Button>
-            </Box>
+              </Select>
+            </FormControl>
 
             <FormControlLabel
               control={
@@ -1725,223 +1476,6 @@ function BlogContent() {
         </DialogActions>
       </Dialog>
 
-      {/* Add Category Dialog */}
-      <Dialog
-        open={categoryDialogOpen}
-        onClose={handleCategoryDialogClose}
-        maxWidth="sm"
-        fullWidth
-      >
-        <DialogTitle>Add Category</DialogTitle>
-        <DialogContent>
-          <Box
-            sx={{
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 2,
-              pt: 2,
-            }}
-          >
-            <TextField
-              label="Category"
-              fullWidth
-              required
-              value={categoryFormData.name}
-              onChange={(e) =>
-                setCategoryFormData({ name: e.target.value })
-              }
-              placeholder="e.g., Insight, Technique, Guide"
-              autoFocus
-            />
-            <Box sx={{ mt: 1 }}>
-              <Typography variant="subtitle2" sx={{ mb: 1 }}>
-                Existing Categories
-              </Typography>
-              {categories.length === 0 ? (
-                <Typography variant="body2" color="text.secondary">
-                  No categories yet.
-                </Typography>
-              ) : (
-                <Box
-                  sx={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: 1,
-                    maxHeight: 200,
-                    overflowY: 'auto',
-                  }}
-                >
-                  {categories.map((category) => (
-                    <Box
-                      key={category._id}
-                      sx={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        border: '1px solid',
-                        borderColor: 'divider',
-                        borderRadius: 1,
-                        px: 1.5,
-                        py: 1,
-                      }}
-                    >
-                      <Typography>{category.name}</Typography>
-                      <IconButton
-                        size="small"
-                        color="error"
-                        onClick={() => handleCategoryDeleteClick(category)}
-                      >
-                        <DeleteIcon fontSize="small" />
-                      </IconButton>
-                    </Box>
-                  ))}
-                </Box>
-              )}
-            </Box>
-          </Box>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCategoryDialogClose}>Cancel</Button>
-          <Button onClick={handleCategorySubmit} variant="contained">
-            Create Category
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Add Tag Dialog */}
-      <Dialog
-        open={tagDialogOpen}
-        onClose={handleTagDialogClose}
-        maxWidth="sm"
-        fullWidth
-      >
-        <DialogTitle>Add Tag</DialogTitle>
-        <DialogContent>
-          <Box
-            sx={{
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 2,
-              pt: 2,
-            }}
-          >
-            <TextField
-              label="Tag"
-              fullWidth
-              required
-              value={tagFormData.name}
-              onChange={(e) =>
-                setTagFormData({ name: e.target.value })
-              }
-              placeholder="e.g., Security, Awareness, Training"
-              autoFocus
-            />
-            <Box sx={{ mt: 1 }}>
-              <Typography variant="subtitle2" sx={{ mb: 1 }}>
-                Existing Tags
-              </Typography>
-              {tags.length === 0 ? (
-                <Typography variant="body2" color="text.secondary">
-                  No tags yet.
-                </Typography>
-              ) : (
-                <Box
-                  sx={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: 1,
-                    maxHeight: 200,
-                    overflowY: 'auto',
-                  }}
-                >
-                  {tags.map((tag) => (
-                    <Box
-                      key={tag._id}
-                      sx={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        border: '1px solid',
-                        borderColor: 'divider',
-                        borderRadius: 1,
-                        px: 1.5,
-                        py: 1,
-                      }}
-                    >
-                      <Typography>{tag.name}</Typography>
-                      <IconButton
-                        size="small"
-                        color="error"
-                        onClick={() => handleTagDeleteClick(tag)}
-                      >
-                        <DeleteIcon fontSize="small" />
-                      </IconButton>
-                    </Box>
-                  ))}
-                </Box>
-              )}
-            </Box>
-          </Box>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleTagDialogClose}>Cancel</Button>
-          <Button onClick={handleTagSubmit} variant="contained">
-            Create Tag
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Delete Category Dialog */}
-      <Dialog
-        open={categoryDeleteDialogOpen}
-        onClose={handleCategoryDeleteCancel}
-        maxWidth="sm"
-        fullWidth
-      >
-        <DialogTitle>Delete Category</DialogTitle>
-        <DialogContent>
-          <Typography>
-            Delete &ldquo;{categoryToDelete?.name}&rdquo;? This will remove the
-            category from the database.
-          </Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCategoryDeleteCancel}>Cancel</Button>
-          <Button
-            onClick={handleCategoryDeleteConfirm}
-            variant="contained"
-            color="error"
-          >
-            Delete
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Delete Tag Dialog */}
-      <Dialog
-        open={tagDeleteDialogOpen}
-        onClose={handleTagDeleteCancel}
-        maxWidth="sm"
-        fullWidth
-      >
-        <DialogTitle>Delete Tag</DialogTitle>
-        <DialogContent>
-          <Typography>
-            Delete &ldquo;{tagToDelete?.name}&rdquo;? This will remove the tag
-            from the database and any assigned posts.
-          </Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleTagDeleteCancel}>Cancel</Button>
-          <Button
-            onClick={handleTagDeleteConfirm}
-            variant="contained"
-            color="error"
-          >
-            Delete
-          </Button>
-        </DialogActions>
-      </Dialog>
 
       {/* Snackbar */}
       <Snackbar

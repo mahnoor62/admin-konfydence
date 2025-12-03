@@ -779,6 +779,32 @@ if (!API_BASE_URL) {
 const API_URL = `${API_BASE_URL}/api`;
 console.log('🔗 Admin Products API URL:', API_URL);
 
+// Fixed Product Categories (matches shop page filters)
+const PRODUCT_CATEGORIES = [
+  { value: 'membership', label: 'Membership' },
+  { value: 'template', label: 'Template' },
+  { value: 'course', label: 'Course' },
+  { value: 'guide', label: 'Guide' },
+  { value: 'toolkit', label: 'Toolkit' },
+  { value: 'digital-guide', label: 'Digital Guide' },
+];
+
+// Fixed Use Case / Types (matches shop page filters)
+const USE_CASE_TYPES = [
+  { value: 'leadership', label: 'Leadership' },
+  { value: 'oncall', label: 'OnCall' },
+  { value: 'community', label: 'Community' },
+  { value: 'starter', label: 'Starter' },
+  { value: 'bundle', label: 'Bundle' },
+];
+
+// Trust Badges (fixed list for B2C products)
+const TRUST_BADGES = [
+  { value: 'gdpr-compliant', label: 'GDPR-compliant' },
+  { value: 'safe-checkout', label: 'Safe checkout' },
+  { value: 'money-back-guarantee', label: 'Money-back guarantee' },
+];
+
 // sirf headers helper, koi axios instance nahi
 function getAuthHeaders(extraHeaders = {}) {
   if (typeof window === 'undefined') {
@@ -820,6 +846,8 @@ function ProductsContent() {
     description: '',
     price: '',
     type: '',
+    category: '',
+    targetAudience: '',
     imageUrl: '',
     badges: [],
     isActive: true,
@@ -1014,7 +1042,9 @@ function ProductsContent() {
         slug: product.slug,
         description: product.description,
         price: product.price.toString(),
-        type: product.type,
+        type: product.type || '',
+        category: product.category || '',
+        targetAudience: product.targetAudience || '',
         imageUrl: product.imageUrl,
         badges: product.badges || [],
         isActive: product.isActive,
@@ -1027,7 +1057,9 @@ function ProductsContent() {
         slug: '',
         description: '',
         price: '',
-        type: productTypes.length > 0 ? productTypes[0].slug : '',
+        type: '',
+        category: '',
+        targetAudience: '',
         imageUrl: '',
         badges: [],
         isActive: true,
@@ -1257,6 +1289,9 @@ function ProductsContent() {
         price: parseFloat(formData.price),
         badges: formData.badges,
         sortOrder: parseInt(formData.sortOrder.toString(), 10) || 0,
+        // Only include category and targetAudience if they have values
+        ...(formData.category && { category: formData.category }),
+        ...(formData.targetAudience && { targetAudience: formData.targetAudience }),
       };
 
       const headers = getAuthHeaders();
@@ -1582,32 +1617,70 @@ function ProductsContent() {
                   setFormData({ ...formData, price: e.target.value })
                 }
               />
-              <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start' }}>
-                <TextField
-                  select
-                  label="Type"
-                  fullWidth
-                  required
-                  value={formData.type}
-                  onChange={(e) =>
-                    setFormData({ ...formData, type: e.target.value })
-                  }
-                >
-                  {productTypes.map((type) => (
-                    <MenuItem key={type._id} value={type.slug}>
-                      {type.name}
-                    </MenuItem>
-                  ))}
-                </TextField>
-                <Button
-                  variant="outlined"
-                  startIcon={<AddIcon />}
-                  onClick={handleTypeDialogOpen}
-                  sx={{ mt: 1, whiteSpace: 'nowrap' }}
-                >
-                  Add Type
-                </Button>
-              </Box>
+              {/* Use Case / Type Dropdown */}
+              <TextField
+                select
+                label="Type (Use Case / Type)"
+                fullWidth
+                required
+                value={formData.type}
+                onChange={(e) =>
+                  setFormData({ ...formData, type: e.target.value })
+                }
+                helperText="Select: Leadership, OnCall, Community, Starter, or Bundle"
+              >
+                {USE_CASE_TYPES.map((type) => (
+                  <MenuItem key={type.value} value={type.value}>
+                    {type.label}
+                  </MenuItem>
+                ))}
+              </TextField>
+              
+              {/* Product Category Dropdown */}
+              <TextField
+                select
+                label="Category (Product Category)"
+                fullWidth
+                value={formData.category}
+                onChange={(e) =>
+                  setFormData({ ...formData, category: e.target.value })
+                }
+                helperText="Select: Membership, Template, Course, Guide, Toolkit, or Digital Guide"
+              >
+                <MenuItem value="">None</MenuItem>
+                {PRODUCT_CATEGORIES.map((category) => (
+                  <MenuItem key={category.value} value={category.value}>
+                    {category.label}
+                  </MenuItem>
+                ))}
+              </TextField>
+              
+              {/* Target Audience Dropdown */}
+              <TextField
+                select
+                label="Target Audience"
+                fullWidth
+                value={formData.targetAudience}
+                onChange={(e) =>
+                  setFormData({ ...formData, targetAudience: e.target.value })
+                }
+                helperText="Select target audience for B2C/B2B detection"
+              >
+                <MenuItem value="">None</MenuItem>
+                <MenuItem value="private-users">Private Users (B2C)</MenuItem>
+                <MenuItem value="schools">Schools (B2E)</MenuItem>
+                <MenuItem value="businesses">Businesses (B2B)</MenuItem>
+              </TextField>
+              
+              {/* Commented out Add Type button - using fixed list instead */}
+              {/* <Button
+                variant="outlined"
+                startIcon={<AddIcon />}
+                onClick={handleTypeDialogOpen}
+                sx={{ mt: 1, whiteSpace: 'nowrap' }}
+              >
+                Add Type
+              </Button> */}
               <Box
                 sx={{
                   display: 'flex',
@@ -1649,55 +1722,67 @@ function ProductsContent() {
                   onChange={handleImageUpload}
                 />
               </Box>
-              <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start' }}>
-                <FormControl fullWidth>
-                  <InputLabel>Badges</InputLabel>
-                  <Select
-                    multiple
-                    value={formData.badges}
-                    onChange={(e) =>
-                      setFormData({ ...formData, badges: e.target.value })
-                    }
-                    input={<OutlinedInput label="Badges" />}
-                    renderValue={(selected) => (
-                      <Box
-                        sx={{
-                          display: 'flex',
-                          flexWrap: 'wrap',
-                          gap: 0.5,
-                        }}
-                      >
-                        {selected.map((value) => {
-                          const badge = badges.find(
-                            (b) => b.slug === value
-                          );
-                          return (
-                            <Chip
-                              key={value}
-                              label={badge?.name || value}
-                              size="small"
-                            />
-                          );
-                        })}
-                      </Box>
-                    )}
-                  >
-                    {badges.map((badge) => (
-                      <MenuItem key={badge._id} value={badge.slug}>
-                        {badge.name}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-                <Button
-                  variant="outlined"
-                  startIcon={<AddIcon />}
-                  onClick={handleBadgeDialogOpen}
-                  sx={{ mt: 1, whiteSpace: 'nowrap' }}
+              <FormControl fullWidth>
+                <InputLabel id="badges-label">Badges (Trust Badges)</InputLabel>
+                <Select
+                  labelId="badges-label"
+                  multiple
+                  value={formData.badges}
+                  onChange={(e) =>
+                    setFormData({ ...formData, badges: e.target.value })
+                  }
+                  input={<OutlinedInput label="Badges (Trust Badges)" />}
+                  renderValue={(selected) => (
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        flexWrap: 'wrap',
+                        gap: 0.5,
+                      }}
+                    >
+                      {selected.map((value) => {
+                        const trustBadge = TRUST_BADGES.find(
+                          (tb) => tb.value === value
+                        );
+                        return (
+                          <Chip
+                            key={value}
+                            label={trustBadge?.label || value}
+                            size="small"
+                            sx={{
+                              backgroundColor: 'rgba(6, 60, 94, 0.08)',
+                              color: '#063C5E',
+                              fontWeight: 500,
+                            }}
+                          />
+                        );
+                      })}
+                    </Box>
+                  )}
+                  MenuProps={{
+                    PaperProps: {
+                      style: {
+                        maxHeight: 300,
+                        width: 'auto',
+                      },
+                    },
+                    anchorOrigin: {
+                      vertical: 'bottom',
+                      horizontal: 'left',
+                    },
+                    transformOrigin: {
+                      vertical: 'top',
+                      horizontal: 'left',
+                    },
+                  }}
                 >
-                  Add Badge
-                </Button>
-              </Box>
+                  {TRUST_BADGES.map((trustBadge) => (
+                    <MenuItem key={trustBadge.value} value={trustBadge.value}>
+                      {trustBadge.label}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
               <TextField
                 label="Sort Order"
                 type="number"
