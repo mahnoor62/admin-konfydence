@@ -828,6 +828,8 @@ function ProductsContent() {
   const [loadingProducts, setLoadingProducts] = useState(false);
   const [productTypes, setProductTypes] = useState([]);
   const [badges, setBadges] = useState([]);
+  const [allCards, setAllCards] = useState([]);
+  const [loadingCards, setLoadingCards] = useState(false);
   const [open, setOpen] = useState(false);
   const [typeDialogOpen, setTypeDialogOpen] = useState(false);
   const [badgeDialogOpen, setBadgeDialogOpen] = useState(false);
@@ -852,6 +854,7 @@ function ProductsContent() {
     badges: [],
     isActive: true,
     sortOrder: 0,
+    cardIds: [],
   });
   const [typeFormData, setTypeFormData] = useState({
     name: '',
@@ -976,6 +979,34 @@ function ProductsContent() {
       setBadges([]);
     }
   };
+
+  const fetchCards = async () => {
+    try {
+      setLoadingCards(true);
+      const headers = getAuthHeaders({
+        'Cache-Control': 'no-store',
+        Pragma: 'no-cache',
+      });
+  
+      const url = `${API_URL}/cards`;
+      const params = { _t: Date.now() };
+  
+      console.log('📡 API: GET', url, params);
+      const res = await axios.get(url, { headers, params });
+  
+      const cardsData = Array.isArray(res.data) ? res.data : [];
+      setAllCards(cardsData);
+    } catch (error) {
+      console.error('❌ Error fetching cards:', {
+        url: `${API_URL}/cards`,
+        error: error.response?.data || error.message,
+        status: error.response?.status,
+      });
+      setAllCards([]);
+    } finally {
+      setLoadingCards(false);
+    }
+  };
     
 
 
@@ -1029,6 +1060,7 @@ function ProductsContent() {
     fetchProducts();
     fetchProductTypes();
     fetchBadges();
+    fetchCards();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -1049,6 +1081,7 @@ function ProductsContent() {
         badges: product.badges || [],
         isActive: product.isActive,
         sortOrder: product.sortOrder,
+        cardIds: product.cardIds?.map(card => typeof card === 'object' ? card._id : card) || [],
       });
     } else {
       setEditing(null);
@@ -1064,6 +1097,7 @@ function ProductsContent() {
         badges: [],
         isActive: true,
         sortOrder: 0,
+        cardIds: [],
       });
     }
     setOpen(true);
@@ -1289,9 +1323,10 @@ function ProductsContent() {
         price: parseFloat(formData.price),
         badges: formData.badges,
         sortOrder: parseInt(formData.sortOrder.toString(), 10) || 0,
-        // Only include category and targetAudience if they have values
-        ...(formData.category && { category: formData.category }),
-        ...(formData.targetAudience && { targetAudience: formData.targetAudience }),
+        cardIds: formData.cardIds || [],
+        // Always include category and targetAudience (even if empty, to clear them)
+        category: formData.category || null,
+        targetAudience: formData.targetAudience || null,
       };
 
       const headers = getAuthHeaders();
@@ -1485,6 +1520,8 @@ function ProductsContent() {
                 <TableCell>Image</TableCell>
                 <TableCell>Name</TableCell>
                 <TableCell>Type</TableCell>
+                <TableCell>Cards</TableCell>
+                <TableCell>Target Audience</TableCell>
                 <TableCell>Price</TableCell>
                 <TableCell>Active</TableCell>
                 <TableCell>Actions</TableCell>
@@ -1493,13 +1530,13 @@ function ProductsContent() {
             <TableBody>
               {loadingProducts ? (
                 <TableRow>
-                  <TableCell colSpan={6} align="center" sx={{ py: 5 }}>
+                  <TableCell colSpan={8} align="center" sx={{ py: 5 }}>
                     <CircularProgress size={32} />
                   </TableCell>
                 </TableRow>
               ) : products.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
+                  <TableCell colSpan={8} align="center" sx={{ py: 4 }}>
                     <Typography variant="body2" color="text.secondary">
                       No products found. Click &ldquo;Add Product&rdquo; to
                       create your first product.
@@ -1507,60 +1544,113 @@ function ProductsContent() {
                   </TableCell>
                 </TableRow>
               ) : (
-                products.map((product) => (
-                  <TableRow key={product._id}>
-                    <TableCell>
-                      {product.imageUrl ? (
-                        <Box
-                          component="img"
-                          src={product.imageUrl}
-                          alt={product.name}
+                products.map((product) => {
+                  // Format target audience for display
+                  const getTargetAudienceLabel = (targetAudience) => {
+                    if (!targetAudience) return '-';
+                    if (targetAudience === 'private-users') return 'B2C';
+                    if (targetAudience === 'schools') return 'B2E';
+                    if (targetAudience === 'businesses') return 'B2B';
+                    return targetAudience;
+                  };
+
+                  return (
+                    <TableRow key={product._id}>
+                      <TableCell>
+                        {product.imageUrl ? (
+                          <Box
+                            component="img"
+                            src={product.imageUrl}
+                            alt={product.name}
+                            sx={{
+                              width: 60,
+                              height: 60,
+                              objectFit: 'cover',
+                              borderRadius: 1,
+                              border: '1px solid rgba(0,0,0,0.1)',
+                            }}
+                          />
+                        ) : (
+                          <Box
+                            sx={{
+                              width: 60,
+                              height: 60,
+                              backgroundColor: 'rgba(0,0,0,0.05)',
+                              borderRadius: 1,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              color: 'text.secondary',
+                              fontSize: '0.75rem',
+                            }}
+                          >
+                            No Image
+                          </Box>
+                        )}
+                      </TableCell>
+                      <TableCell>{product.name}</TableCell>
+                      <TableCell>{product.type}</TableCell>
+                      <TableCell>
+                        {product.cardIds && product.cardIds.length > 0 ? (
+                          <Chip
+                            label={`${product.cardIds.length} card${product.cardIds.length !== 1 ? 's' : ''}`}
+                            size="small"
+                            sx={{
+                              backgroundColor: 'rgba(11, 120, 151, 0.1)',
+                              color: '#0B7897',
+                              fontWeight: 500,
+                            }}
+                          />
+                        ) : (
+                          <Typography variant="caption" color="text.secondary">
+                            No cards
+                          </Typography>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <Chip
+                          label={getTargetAudienceLabel(product.targetAudience)}
+                          size="small"
                           sx={{
-                            width: 60,
-                            height: 60,
-                            objectFit: 'cover',
-                            borderRadius: 1,
-                            border: '1px solid rgba(0,0,0,0.1)',
+                            backgroundColor:
+                              product.targetAudience === 'private-users'
+                                ? 'rgba(11, 120, 151, 0.1)'
+                                : product.targetAudience === 'schools'
+                                ? 'rgba(255, 152, 0, 0.1)'
+                                : product.targetAudience === 'businesses'
+                                ? 'rgba(76, 175, 80, 0.1)'
+                                : 'rgba(0, 0, 0, 0.05)',
+                            color:
+                              product.targetAudience === 'private-users'
+                                ? '#0B7897'
+                                : product.targetAudience === 'schools'
+                                ? '#FF9800'
+                                : product.targetAudience === 'businesses'
+                                ? '#4CAF50'
+                                : 'text.secondary',
+                            fontWeight: 600,
                           }}
                         />
-                      ) : (
-                        <Box
-                          sx={{
-                            width: 60,
-                            height: 60,
-                            backgroundColor: 'rgba(0,0,0,0.05)',
-                            borderRadius: 1,
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            color: 'text.secondary',
-                            fontSize: '0.75rem',
-                          }}
+                      </TableCell>
+                      <TableCell>€{product.price}</TableCell>
+                      <TableCell>{product.isActive ? 'Yes' : 'No'}</TableCell>
+                      <TableCell>
+                        <IconButton
+                          size="small"
+                          onClick={() => handleOpen(product)}
                         >
-                          No Image
-                        </Box>
-                      )}
-                    </TableCell>
-                    <TableCell>{product.name}</TableCell>
-                    <TableCell>{product.type}</TableCell>
-                    <TableCell>€{product.price}</TableCell>
-                    <TableCell>{product.isActive ? 'Yes' : 'No'}</TableCell>
-                    <TableCell>
-                      <IconButton
-                        size="small"
-                        onClick={() => handleOpen(product)}
-                      >
-                        <EditIcon />
-                      </IconButton>
-                      <IconButton
-                        size="small"
-                        onClick={() => handleDeleteClick(product)}
-                      >
-                        <DeleteIcon />
-                      </IconButton>
-                    </TableCell>
-                  </TableRow>
-                ))
+                          <EditIcon />
+                        </IconButton>
+                        <IconButton
+                          size="small"
+                          onClick={() => handleDeleteClick(product)}
+                        >
+                          <DeleteIcon />
+                        </IconButton>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
               )}
             </TableBody>
           </Table>
@@ -1782,6 +1872,93 @@ function ProductsContent() {
                     </MenuItem>
                   ))}
                 </Select>
+              </FormControl>
+              
+              {/* Attached Cards Selection */}
+              <FormControl fullWidth>
+                <InputLabel id="cards-label">Attached Cards</InputLabel>
+                <Select
+                  labelId="cards-label"
+                  multiple
+                  value={formData.cardIds}
+                  onChange={(e) =>
+                    setFormData({ ...formData, cardIds: e.target.value })
+                  }
+                  input={<OutlinedInput label="Attached Cards" />}
+                  renderValue={(selected) => (
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        flexWrap: 'wrap',
+                        gap: 0.5,
+                      }}
+                    >
+                      {selected.length === 0 ? (
+                        <Typography variant="body2" color="text.secondary">
+                          No cards selected
+                        </Typography>
+                      ) : (
+                        selected.map((cardId) => {
+                          const card = allCards.find((c) => c._id === cardId);
+                          const levelCount = card?.levels?.length || 0;
+                          return (
+                            <Chip
+                              key={cardId}
+                              label={
+                                card
+                                  ? `${card.title || 'Untitled'} (${levelCount} level${levelCount !== 1 ? 's' : ''})`
+                                  : cardId
+                              }
+                              size="small"
+                              sx={{
+                                backgroundColor: 'rgba(11, 120, 151, 0.08)',
+                                color: '#0B7897',
+                                fontWeight: 500,
+                              }}
+                            />
+                          );
+                        })
+                      )}
+                    </Box>
+                  )}
+                  MenuProps={{
+                    PaperProps: {
+                      style: {
+                        maxHeight: 400,
+                        width: 'auto',
+                      },
+                    },
+                  }}
+                  disabled={loadingCards}
+                >
+                  {loadingCards ? (
+                    <MenuItem disabled>
+                      <CircularProgress size={20} sx={{ mr: 1 }} />
+                      Loading cards...
+                    </MenuItem>
+                  ) : allCards.length === 0 ? (
+                    <MenuItem disabled>No cards available</MenuItem>
+                  ) : (
+                    allCards.map((card) => {
+                      const levelCount = card.levels?.length || 0;
+                      return (
+                        <MenuItem key={card._id} value={card._id}>
+                          <Box>
+                            <Typography variant="body2" fontWeight={500}>
+                              {card.title || 'Untitled Card'}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              {card.category || 'No category'} • {levelCount} level{levelCount !== 1 ? 's' : ''}
+                            </Typography>
+                          </Box>
+                        </MenuItem>
+                      );
+                    })
+                  )}
+                </Select>
+                <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5 }}>
+                  Select cards to attach to this product. Users will gain access to these cards when purchasing.
+                </Typography>
               </FormControl>
               <TextField
                 label="Sort Order"

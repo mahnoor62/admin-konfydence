@@ -28,15 +28,32 @@ import ContactMailIcon from '@mui/icons-material/ContactMail';
 import LogoutIcon from '@mui/icons-material/Logout';
 import MenuIcon from '@mui/icons-material/Menu';
 import PeopleIcon from '@mui/icons-material/People';
+import SchoolIcon from '@mui/icons-material/School';
+import CardMembershipIcon from '@mui/icons-material/CardMembership';
+import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
+import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
+import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import SettingsIcon from '@mui/icons-material/Settings';
+import DescriptionIcon from '@mui/icons-material/Description';
+import InventoryIcon from '@mui/icons-material/Inventory';
+import RequestQuoteIcon from '@mui/icons-material/RequestQuote';
 
 const drawerWidth = 240;
 
 const menuItems = [
-  { label: 'Dashboard', href: '/', icon: DashboardIcon },
-  { label: 'Products', href: '/products', icon: ShoppingBagIcon },
-  { label: 'Blog Posts', href: '/blog', icon: ArticleIcon },
-  { label: 'Partner Logos', href: '/partners', icon: BusinessIcon },
-  { label: 'Leads', href: '/leads', icon: ContactMailIcon },
+  { label: 'Dashboard', href: '/', icon: DashboardIcon, permission: '*' },
+  { label: 'Cards', href: '/cards', icon: DescriptionIcon, permission: 'cards' },
+  { label: 'Packages', href: '/packages', icon: InventoryIcon, permission: 'packages' },
+  { label: 'Custom Package Requests', href: '/custom-package-requests', icon: RequestQuoteIcon, permission: 'packages' },
+  { label: 'Users', href: '/users', icon: PeopleIcon, permission: 'users' },
+  { label: 'Organizations', href: '/organizations', icon: AccountBalanceIcon, permission: 'organizations' },
+  { label: 'Sales & Memberships', href: '/sales', icon: ShoppingCartIcon, permission: 'transactions' },
+  { label: 'Trials', href: '/demos', icon: PlayArrowIcon, permission: 'demos' },
+  { label: 'Leads', href: '/leads', icon: ContactMailIcon, permission: 'leads' },
+  { label: 'Settings', href: '/settings', icon: SettingsIcon, permission: '*' },
+  { label: 'Products', href: '/products', icon: ShoppingBagIcon, permission: '*' },
+  { label: 'Blog Posts', href: '/blog', icon: ArticleIcon, permission: '*' },
+  { label: 'Partner Logos', href: '/partners', icon: BusinessIcon, permission: '*' },
 ];
 
 export default function AdminLayout({ children }) {
@@ -51,14 +68,50 @@ export default function AdminLayout({ children }) {
     if (!token && pathname !== '/login' && pathname !== '/register') {
       router.push('/login');
     } else if (token) {
+      fetchAdminProfile();
+    }
+  }, [pathname, router]);
+
+  const fetchAdminProfile = async () => {
+    try {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('admin_token') : null;
+      if (!token) return;
+
+      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
+      const API_URL = `${API_BASE_URL}/api`;
+      
+      const response = await fetch(`${API_URL}/auth/admin/me`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        const adminData = await response.json();
+        setUser(adminData);
+        // Also store in localStorage for quick access
+        localStorage.setItem('admin_user', JSON.stringify(adminData));
+      } else {
+        // Fallback to localStorage if API fails
+        try {
+          const userData = JSON.parse(localStorage.getItem('admin_user') || '{}');
+          setUser(userData);
+        } catch (error) {
+          console.error('Error parsing user data:', error);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching admin profile:', error);
+      // Fallback to localStorage if API fails
       try {
         const userData = JSON.parse(localStorage.getItem('admin_user') || '{}');
         setUser(userData);
-      } catch (error) {
-        console.error('Error parsing user data:', error);
+      } catch (err) {
+        console.error('Error parsing user data:', err);
       }
     }
-  }, [pathname, router]);
+  };
 
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
@@ -93,6 +146,8 @@ export default function AdminLayout({ children }) {
       <List sx={{ mt: 2 }}>
         {menuItems.map((item) => {
           const active = pathname === item.href;
+          // Basic permission check - can be enhanced with actual RBAC
+          // For now, show all items if user has admin token
           return (
             <ListItem key={item.href} disablePadding sx={{ px: 2 }}>
               <ListItemButton
@@ -152,10 +207,12 @@ export default function AdminLayout({ children }) {
             Admin Panel
           </Typography>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Typography variant="body2">{user?.email || 'Admin'}</Typography>
+            <Typography variant="body2" sx={{ fontWeight: 500 }}>
+              {user?.name || user?.email || 'Admin'}
+            </Typography>
             <IconButton onClick={handleMenuClick} size="small">
               <Avatar sx={{ width: 32, height: 32, bgcolor: 'secondary.main' }}>
-                {user?.email?.[0]?.toUpperCase() || 'A'}
+                {user?.name?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase() || 'A'}
               </Avatar>
             </IconButton>
             <Menu

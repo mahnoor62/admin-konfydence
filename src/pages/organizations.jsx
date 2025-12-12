@@ -1,12 +1,12 @@
 'use client';
 export const dynamic = 'force-dynamic';
 import AdminLayout from '@/components/AdminLayout';
-import Leads from '@/components/admin/leads/page';
+import Organizations from '@/components/admin/organizations/page';
 
-export default function LeadsPage() {
+export default function OrganizationsPage() {
   return (
     <AdminLayout>
-      <Leads />
+      <Organizations />
     </AdminLayout>
   );
 }
