@@ -1432,6 +1432,33 @@ function ProductsContent() {
     const file = event.target.files && event.target.files[0];
     if (!file) return;
 
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      setSnackbar({
+        open: true,
+        message: 'Invalid file type. Please select an image file (JPG, PNG, GIF, etc.)',
+        severity: 'error',
+      });
+      if (event.target) {
+        event.target.value = '';
+      }
+      return;
+    }
+
+    // Validate file size (max 10MB)
+    const maxSize = 10 * 1024 * 1024; // 10MB in bytes
+    if (file.size > maxSize) {
+      setSnackbar({
+        open: true,
+        message: 'File size too large. Please select an image smaller than 10MB',
+        severity: 'error',
+      });
+      if (event.target) {
+        event.target.value = '';
+      }
+      return;
+    }
+
     const form = new FormData();
     form.append('file', file);
 
@@ -1446,14 +1473,54 @@ function ProductsContent() {
       setFormData((prev) => ({ ...prev, imageUrl: res.data.url }));
       setSnackbar({
         open: true,
-        message: 'Image uploaded',
+        message: 'Image uploaded successfully',
         severity: 'success',
       });
     } catch (error) {
       console.error('Error uploading image:', error);
+      
+      let errorMessage = 'Failed to upload image';
+      
+      // Handle different error scenarios
+      if (error.response) {
+        // Server responded with error status
+        const status = error.response.status;
+        const errorData = error.response.data;
+        
+        if (status === 401) {
+          errorMessage = 'Authentication failed. Please log in again and try uploading the image';
+        } else if (status === 403) {
+          errorMessage = 'You do not have permission to upload images. Please contact your administrator';
+        } else if (status === 413) {
+          errorMessage = 'File size too large. Please select an image smaller than 10MB';
+        } else if (status === 415) {
+          errorMessage = 'Unsupported file type. Please select a valid image file (JPG, PNG, GIF, etc.)';
+        } else if (status === 500) {
+          errorMessage = 'Server error occurred while uploading image. Please try again later';
+        } else if (errorData?.error) {
+          errorMessage = `Upload failed: ${errorData.error}`;
+        } else if (errorData?.message) {
+          errorMessage = `Upload failed: ${errorData.message}`;
+        } else {
+          errorMessage = `Upload failed with status ${status}. Please try again`;
+        }
+      } else if (error.request) {
+        // Request was made but no response received
+        errorMessage = 'Network error. Please check your internet connection and try again';
+      } else if (error.message) {
+        // Error occurred in setting up the request
+        if (error.message.includes('Network Error')) {
+          errorMessage = 'Network error. Please check your internet connection and try again';
+        } else if (error.message.includes('timeout')) {
+          errorMessage = 'Upload timeout. The file may be too large or your connection is slow. Please try again';
+        } else {
+          errorMessage = `Upload error: ${error.message}`;
+        }
+      }
+      
       setSnackbar({
         open: true,
-        message: 'Failed to upload image',
+        message: errorMessage,
         severity: 'error',
       });
     } finally {
