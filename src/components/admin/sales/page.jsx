@@ -70,10 +70,6 @@ export default function Sales() {
   const [isDeletingContract, setIsDeletingContract] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
-  useEffect(() => {
-    fetchData();
-  }, [typeFilter, tabValue, fetchData]);
-
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
@@ -175,6 +171,10 @@ export default function Sales() {
       setLoading(false);
     }
   }, [tabValue, typeFilter, membershipStatusFilter]);
+
+  useEffect(() => {
+    fetchData();
+  }, [typeFilter, tabValue, fetchData]);
 
   const handleOpenDelete = (item, isContract = false) => {
     setItemToDelete({ ...item, isContract });

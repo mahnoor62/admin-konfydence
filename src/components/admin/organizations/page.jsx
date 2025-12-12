@@ -85,10 +85,6 @@ export default function Organizations() {
     status: 'prospect',
   });
 
-  useEffect(() => {
-    fetchOrganizations();
-  }, [statusFilter, fetchOrganizations]);
-
   const fetchOrganizations = useCallback(async () => {
     try {
       setLoading(true);
@@ -107,6 +103,10 @@ export default function Organizations() {
       setLoading(false);
     }
   }, [statusFilter]);
+
+  useEffect(() => {
+    fetchOrganizations();
+  }, [statusFilter, fetchOrganizations]);
 
   const handleViewDetail = async (orgId) => {
     try {

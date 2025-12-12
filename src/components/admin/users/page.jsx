@@ -66,10 +66,6 @@ export default function Users() {
   const [deleting, setDeleting] = useState(false);
   const [tabValue, setTabValue] = useState(0);
 
-  useEffect(() => {
-    fetchUsers();
-  }, [tabValue, fetchUsers]);
-
   const fetchUsers = useCallback(async () => {
     try {
       setLoading(true);
@@ -85,6 +81,10 @@ export default function Users() {
       setLoading(false);
     }
   }, [tabValue]);
+
+  useEffect(() => {
+    fetchUsers();
+  }, [tabValue, fetchUsers]);
 
   const handleViewDetail = async (userId) => {
     try {

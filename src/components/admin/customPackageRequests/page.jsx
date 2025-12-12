@@ -94,12 +94,7 @@ export default function CustomPackageRequests() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
-  useEffect(() => {
-    fetchRequests();
-    fetchOrganizations();
-  }, [statusFilter, fetchRequests]);
-
-  const fetchOrganizations = async () => {
+  const fetchOrganizations = useCallback(async () => {
     try {
       const api = getApiInstance();
       const res = await api.get('/organizations');
@@ -107,20 +102,7 @@ export default function CustomPackageRequests() {
     } catch (err) {
       console.error('Error fetching organizations:', err);
     }
-  };
-
-  const fetchCards = async () => {
-    try {
-      setLoadingCards(true);
-      const api = getApiInstance();
-      const res = await api.get('/cards');
-      setAllCards(res.data || []);
-    } catch (err) {
-      console.error('Error fetching cards:', err);
-    } finally {
-      setLoadingCards(false);
-    }
-  };
+  }, []);
 
   const fetchRequests = useCallback(async () => {
     try {
@@ -161,6 +143,24 @@ export default function CustomPackageRequests() {
       setLoading(false);
     }
   }, [statusFilter]);
+
+  useEffect(() => {
+    fetchRequests();
+    fetchOrganizations();
+  }, [fetchRequests, fetchOrganizations]);
+
+  const fetchCards = async () => {
+    try {
+      setLoadingCards(true);
+      const api = getApiInstance();
+      const res = await api.get('/cards');
+      setAllCards(res.data || []);
+    } catch (err) {
+      console.error('Error fetching cards:', err);
+    } finally {
+      setLoadingCards(false);
+    }
+  };
 
   const handleViewRequest = (request) => {
     setSelectedRequest(request);
