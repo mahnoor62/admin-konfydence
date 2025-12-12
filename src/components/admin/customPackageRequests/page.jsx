@@ -32,6 +32,7 @@ import {
   FormGroup,
   Divider,
   Chip as MuiChip,
+  Snackbar,
 } from '@mui/material';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
@@ -93,6 +94,8 @@ export default function CustomPackageRequests() {
   const [loadingCards, setLoadingCards] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
 
   const fetchOrganizations = useCallback(async () => {
     try {
@@ -219,8 +222,29 @@ export default function CustomPackageRequests() {
     if (!selectedRequest) return;
 
     try {
+      setUpdatingStatus(true);
       const api = getApiInstance();
-      await api.put(`/custom-package-requests/${selectedRequest._id}/status`, statusUpdateData);
+      const response = await api.put(`/custom-package-requests/${selectedRequest._id}/status`, statusUpdateData);
+      
+      // Check if email was sent
+      const emailSent = response.data?.emailSent || false;
+      const organizationName = selectedRequest.organizationName || 'the organization';
+      
+      // Show success message
+      if (emailSent) {
+        setSnackbar({
+          open: true,
+          message: `Status updated and email sent to to ${organizationName}`,
+          severity: 'success'
+        });
+      } else {
+        setSnackbar({
+          open: true,
+          message: 'Status updated',
+          severity: 'success'
+        });
+      }
+      
       setStatusUpdateDialog(false);
       setSelectedRequest(null);
       setStatusUpdateData({ status: '', adminNotes: '' });
@@ -229,6 +253,13 @@ export default function CustomPackageRequests() {
     } catch (err) {
       console.error('Error updating status:', err);
       setError(err.response?.data?.error || 'Failed to update status');
+      setSnackbar({
+        open: true,
+        message: err.response?.data?.error || 'Failed to update status',
+        severity: 'error'
+      });
+    } finally {
+      setUpdatingStatus(false);
     }
   };
 
@@ -647,22 +678,43 @@ export default function CustomPackageRequests() {
       <Dialog
         open={statusUpdateDialog}
         onClose={() => {
-          setStatusUpdateDialog(false);
-          setSelectedRequest(null);
-          setStatusUpdateData({ status: '', adminNotes: '' });
+          if (!updatingStatus) {
+            setStatusUpdateDialog(false);
+            setSelectedRequest(null);
+            setStatusUpdateData({ status: '', adminNotes: '' });
+          }
         }}
         maxWidth="sm"
         fullWidth
       >
         <DialogTitle>Update Request Status</DialogTitle>
         <DialogContent>
-          <Box sx={{ mt: 2 }}>
+          <Box sx={{ mt: 2, position: 'relative' }}>
+            {updatingStatus && (
+              <Box
+                sx={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  backgroundColor: 'rgba(255, 255, 255, 0.8)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  zIndex: 1,
+                }}
+              >
+                <CircularProgress />
+              </Box>
+            )}
             <FormControl fullWidth sx={{ mb: 2 }}>
               <InputLabel>Status</InputLabel>
               <Select
                 value={statusUpdateData.status}
                 label="Status"
                 onChange={(e) => setStatusUpdateData({ ...statusUpdateData, status: e.target.value })}
+                disabled={updatingStatus}
               >
                 <MenuItem value="pending">Pending</MenuItem>
                 <MenuItem value="reviewing">Reviewing</MenuItem>
@@ -680,19 +732,28 @@ export default function CustomPackageRequests() {
               onChange={(e) => setStatusUpdateData({ ...statusUpdateData, adminNotes: e.target.value })}
               placeholder="Add any notes or comments for the customer..."
               helperText="These notes will be included in the email notification to the customer"
+              disabled={updatingStatus}
             />
           </Box>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => {
-            setStatusUpdateDialog(false);
-            setSelectedRequest(null);
-            setStatusUpdateData({ status: '', adminNotes: '' });
-          }}>
+          <Button 
+            onClick={() => {
+              setStatusUpdateDialog(false);
+              setSelectedRequest(null);
+              setStatusUpdateData({ status: '', adminNotes: '' });
+            }}
+            disabled={updatingStatus}
+          >
             Cancel
           </Button>
-          <Button onClick={handleStatusUpdateSubmit} variant="contained">
-            Update
+          <Button 
+            onClick={handleStatusUpdateSubmit} 
+            variant="contained"
+            disabled={updatingStatus || !statusUpdateData.status}
+            startIcon={updatingStatus ? <CircularProgress size={16} /> : null}
+          >
+            {updatingStatus ? 'Updating...' : 'Update'}
           </Button>
         </DialogActions>
       </Dialog>
@@ -941,7 +1002,13 @@ export default function CustomPackageRequests() {
           }} disabled={creating}>
             Cancel
           </Button>
-          <Button onClick={handleCreatePackageSubmit} variant="contained" color="success" disabled={creating}>
+          <Button 
+            onClick={handleCreatePackageSubmit} 
+            variant="contained" 
+            color="success" 
+            disabled={creating}
+            startIcon={creating ? <CircularProgress size={16} color="inherit" /> : null}
+          >
             {creating ? 'Creating...' : 'Create Package'}
           </Button>
         </DialogActions>
@@ -979,11 +1046,28 @@ export default function CustomPackageRequests() {
             variant="contained" 
             color="error"
             disabled={deleting}
+            startIcon={deleting ? <CircularProgress size={16} /> : null}
           >
             {deleting ? 'Deleting...' : 'Delete'}
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Success/Error Snackbar */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert 
+          onClose={() => setSnackbar({ ...snackbar, open: false })} 
+          severity={snackbar.severity}
+          sx={{ width: '100%' }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }

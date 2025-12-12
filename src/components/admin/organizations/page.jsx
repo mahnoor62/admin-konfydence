@@ -26,6 +26,7 @@ import {
   FormControl,
   InputLabel,
   Select,
+  Autocomplete,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import VisibilityIcon from '@mui/icons-material/Visibility';
@@ -72,6 +73,9 @@ export default function Organizations() {
   const [orgToDelete, setOrgToDelete] = useState(null);
   const [deleting, setDeleting] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [customPackageRequests, setCustomPackageRequests] = useState([]);
+  const [loadingRequests, setLoadingRequests] = useState(false);
+  const [selectedRequestId, setSelectedRequestId] = useState('');
   const [formData, setFormData] = useState({
     name: '',
     type: '',
@@ -104,9 +108,42 @@ export default function Organizations() {
     }
   }, [statusFilter]);
 
+  const fetchCustomPackageRequests = useCallback(async () => {
+    try {
+      setLoadingRequests(true);
+      const api = getApiInstance();
+      const response = await api.get('/custom-package-requests', { params: { status: 'all' } });
+      // Filter unique organizations by organizationName
+      const uniqueOrgs = [];
+      const seenNames = new Set();
+      response.data.forEach(request => {
+        if (request.organizationName && !seenNames.has(request.organizationName.toLowerCase())) {
+          seenNames.add(request.organizationName.toLowerCase());
+          uniqueOrgs.push({
+            _id: request._id,
+            organizationName: request.organizationName,
+            contactName: request.contactName,
+            contactEmail: request.contactEmail,
+            contactPhone: request.contactPhone,
+          });
+        }
+      });
+      setCustomPackageRequests(uniqueOrgs);
+    } catch (err) {
+      console.error('Error fetching custom package requests:', err);
+      // Don't show error, just log it - this is optional data
+    } finally {
+      setLoadingRequests(false);
+    }
+  }, []);
+
   useEffect(() => {
     fetchOrganizations();
   }, [statusFilter, fetchOrganizations]);
+
+  useEffect(() => {
+    fetchCustomPackageRequests();
+  }, [fetchCustomPackageRequests]);
 
   const handleViewDetail = async (orgId) => {
     try {
@@ -133,6 +170,7 @@ export default function Organizations() {
       },
       status: 'prospect',
     });
+    setSelectedRequestId('');
     setCreateOpen(true);
   };
 
@@ -150,6 +188,34 @@ export default function Organizations() {
       },
       status: 'prospect',
     });
+    setSelectedRequestId('');
+  };
+
+  const handleRequestSelect = (value) => {
+    if (!value || typeof value === 'string') {
+      // User cleared or typed manually - just update name if it's a string
+      if (typeof value === 'string') {
+        setFormData({
+          ...formData,
+          name: value,
+        });
+      }
+      setSelectedRequestId('');
+    } else {
+      // User selected from dropdown - it's an object
+      const selectedRequest = value;
+      setSelectedRequestId(selectedRequest._id);
+      setFormData({
+        ...formData,
+        name: selectedRequest.organizationName || '',
+        primaryContact: {
+          ...formData.primaryContact,
+          name: selectedRequest.contactName || '',
+          email: selectedRequest.contactEmail || '',
+          phone: selectedRequest.contactPhone || '',
+        },
+      });
+    }
   };
 
   const handleSubmitCreate = async () => {
@@ -377,12 +443,41 @@ export default function Organizations() {
         <DialogContent>
           <Grid container spacing={2} sx={{ mt: 1 }}>
             <Grid item xs={12}>
-              <TextField
-                fullWidth
-                label="Organization Name"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                required
+              <Autocomplete
+                freeSolo
+                options={customPackageRequests}
+                getOptionLabel={(option) => {
+                  if (typeof option === 'string') {
+                    return option;
+                  }
+                  return option.organizationName || '';
+                }}
+                value={selectedRequestId ? customPackageRequests.find(req => req._id === selectedRequestId) : null}
+                inputValue={formData.name}
+                onChange={(event, newValue) => {
+                  handleRequestSelect(newValue);
+                }}
+                onInputChange={(event, newInputValue, reason) => {
+                  // Update name field when user types
+                  if (reason === 'input') {
+                    setFormData({ ...formData, name: newInputValue });
+                    setSelectedRequestId('');
+                  }
+                }}
+                loading={loadingRequests}
+                disabled={loadingRequests}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    label="Organization Name (Select from Requests or Type)"
+                    required
+                  />
+                )}
+                renderOption={(props, option) => (
+                  <Box component="li" {...props} key={option._id}>
+                    {option.organizationName}
+                  </Box>
+                )}
               />
             </Grid>
             <Grid item xs={12} sm={6}>
