@@ -72,6 +72,8 @@ export default function Organizations() {
   const [orgToEdit, setOrgToEdit] = useState(null);
   const [orgToDelete, setOrgToDelete] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState(null);
+  const [deleteSuccess, setDeleteSuccess] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [customPackageRequests, setCustomPackageRequests] = useState([]);
   const [loadingRequests, setLoadingRequests] = useState(false);
@@ -84,7 +86,6 @@ export default function Organizations() {
       name: '',
       email: '',
       phone: '',
-      jobTitle: '',
     },
     status: 'prospect',
   });
@@ -97,7 +98,7 @@ export default function Organizations() {
       if (statusFilter !== 'all') {
         params.status = statusFilter;
       }
-      const response = await api.get('/organizations', { params });
+      const response = await api.get('/organizations/admin', { params });
       setOrganizations(response.data);
       setError(null);
     } catch (err) {
@@ -147,9 +148,12 @@ export default function Organizations() {
 
   const handleViewDetail = async (orgId) => {
     try {
+      setError(null);
       const api = getApiInstance();
       const response = await api.get(`/organizations/${orgId}`);
-      setSelectedOrg(response.data);
+      // Handle both response.data and response.data.organization
+      const orgData = response.data.organization || response.data;
+      setSelectedOrg(orgData ? { organization: orgData, orgUsers: response.data.orgUsers || [] } : response.data);
       setDetailOpen(true);
     } catch (err) {
       console.error('Error fetching organization detail:', err);
@@ -176,6 +180,7 @@ export default function Organizations() {
 
   const handleCloseCreate = () => {
     setCreateOpen(false);
+    setError(null);
     setFormData({
       name: '',
       type: '',
@@ -221,14 +226,34 @@ export default function Organizations() {
   const handleSubmitCreate = async () => {
     try {
       setSubmitting(true);
+      setError(null);
       const api = getApiInstance();
+      
       await api.post('/organizations', formData);
       fetchOrganizations();
       handleCloseCreate();
       setError(null);
     } catch (err) {
       console.error('Error creating organization:', err);
-      setError(err.response?.data?.error || 'Failed to create organization');
+      
+      // Extract detailed error message
+      let errorMessage = 'Failed to create organization';
+      if (err.response?.data) {
+        if (err.response.data.details && Array.isArray(err.response.data.details)) {
+          errorMessage = err.response.data.details.map(d => d.message || d.msg || d).join(', ');
+        } else if (err.response.data.error) {
+          errorMessage = err.response.data.error;
+          if (err.response.data.message) {
+            errorMessage += ': ' + err.response.data.message;
+          }
+        } else if (err.response.data.message) {
+          errorMessage = err.response.data.message;
+        }
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+      
+      setError(errorMessage);
     } finally {
       setSubmitting(false);
     }
@@ -236,9 +261,16 @@ export default function Organizations() {
 
   const handleOpenEdit = async (org) => {
     try {
+      setError(null);
       const api = getApiInstance();
       const response = await api.get(`/organizations/${org._id}`);
-      const orgData = response.data.organization;
+      // Handle both response.data and response.data.organization
+      const orgData = response.data.organization || response.data;
+      
+      if (!orgData) {
+        setError('Organization data not found');
+        return;
+      }
       
       setOrgToEdit(orgData);
       setFormData({
@@ -249,7 +281,6 @@ export default function Organizations() {
           name: orgData.primaryContact?.name || '',
           email: orgData.primaryContact?.email || '',
           phone: orgData.primaryContact?.phone || '',
-          jobTitle: orgData.primaryContact?.jobTitle || '',
         },
         status: orgData.status || 'prospect',
       });
@@ -297,12 +328,17 @@ export default function Organizations() {
 
   const handleOpenDelete = (org) => {
     setOrgToDelete(org);
+    setDeleteError(null);
+    setDeleteSuccess(false);
     setDeleteOpen(true);
   };
 
   const handleCloseDelete = () => {
     setDeleteOpen(false);
     setOrgToDelete(null);
+    setDeleting(false);
+    setDeleteError(null);
+    setDeleteSuccess(false);
   };
 
   const handleConfirmDelete = async () => {
@@ -310,14 +346,40 @@ export default function Organizations() {
 
     try {
       setDeleting(true);
+      setDeleteError(null);
+      setDeleteSuccess(false);
       const api = getApiInstance();
       await api.delete(`/organizations/${orgToDelete._id}`);
-      fetchOrganizations();
-      handleCloseDelete();
-      setError(null);
+      
+      // Show success message
+      setDeleteSuccess(true);
+      
+      // Wait a moment to show success message, then close and refresh
+      setTimeout(() => {
+        fetchOrganizations();
+        handleCloseDelete();
+      }, 1500);
     } catch (err) {
       console.error('Error deleting organization:', err);
-      setError(err.response?.data?.error || 'Failed to delete organization');
+      
+      // Extract detailed error message
+      let errorMessage = 'Failed to delete organization';
+      if (err.response?.data) {
+        if (err.response.data.details && Array.isArray(err.response.data.details)) {
+          errorMessage = err.response.data.details.map(d => d.message || d.msg || d).join(', ');
+        } else if (err.response.data.error) {
+          errorMessage = err.response.data.error;
+          if (err.response.data.message) {
+            errorMessage += ': ' + err.response.data.message;
+          }
+        } else if (err.response.data.message) {
+          errorMessage = err.response.data.message;
+        }
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+      
+      setDeleteError(errorMessage);
       setDeleting(false);
     }
   };
@@ -372,11 +434,7 @@ export default function Organizations() {
         </Box>
       </Box>
 
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
-          {error}
-        </Alert>
-      )}
+      {/* Error display removed from here - errors now show in dialogs */}
 
       <TableContainer component={Paper}>
         <Table>
@@ -404,7 +462,11 @@ export default function Organizations() {
                   <TableCell>{org.name}</TableCell>
                   <TableCell>{org.type}</TableCell>
                   <TableCell>
-                    <Chip label={org.segment} color={org.segment === 'B2B' ? 'primary' : 'info'} size="small" />
+                    {org.segment ? (
+                      <Chip label={org.segment} color={org.segment === 'B2B' ? 'primary' : 'info'} size="small" />
+                    ) : (
+                      <Typography variant="body2" color="text.secondary">-</Typography>
+                    )}
                   </TableCell>
                   <TableCell>
                     <Chip
@@ -427,7 +489,13 @@ export default function Organizations() {
                     <IconButton size="small" onClick={() => handleOpenEdit(org)} color="info" title="Edit Organization">
                       <EditIcon />
                     </IconButton>
-                    <IconButton size="small" onClick={() => handleOpenDelete(org)} color="error" title="Delete Organization">
+                    <IconButton 
+                      size="small" 
+                      onClick={() => handleOpenDelete(org)} 
+                      color="error" 
+                      title="Delete Organization"
+                      disabled={deleting && orgToDelete?._id === org._id}
+                    >
                       <DeleteIcon />
                     </IconButton>
                   </TableCell>
@@ -491,7 +559,7 @@ export default function Organizations() {
               >
                 <MenuItem value="company">Company</MenuItem>
                 <MenuItem value="bank">Bank</MenuItem>
-                <MenuItem value="school">School</MenuItem>
+                <MenuItem value="school">School/Institute</MenuItem>
                 <MenuItem value="govt">Government</MenuItem>
                 <MenuItem value="other">Other</MenuItem>
               </TextField>
@@ -550,17 +618,6 @@ export default function Organizations() {
                 })}
               />
             </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label="Job Title"
-                value={formData.primaryContact.jobTitle}
-                onChange={(e) => setFormData({
-                  ...formData,
-                  primaryContact: { ...formData.primaryContact, jobTitle: e.target.value }
-                })}
-              />
-            </Grid>
           </Grid>
         </DialogContent>
         <DialogActions>
@@ -574,6 +631,11 @@ export default function Organizations() {
       <Dialog open={editOpen} onClose={handleCloseEdit} maxWidth="md" fullWidth>
         <DialogTitle>Edit Organization</DialogTitle>
         <DialogContent>
+          {error && (
+            <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
+              {error}
+            </Alert>
+          )}
           <Grid container spacing={2} sx={{ mt: 1 }}>
             <Grid item xs={12}>
               <TextField
@@ -595,7 +657,6 @@ export default function Organizations() {
               >
                 <MenuItem value="company">Company</MenuItem>
                 <MenuItem value="bank">Bank</MenuItem>
-                <MenuItem value="school">School</MenuItem>
                 <MenuItem value="govt">Government</MenuItem>
                 <MenuItem value="other">Other</MenuItem>
               </TextField>
@@ -668,17 +729,6 @@ export default function Organizations() {
                 })}
               />
             </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label="Job Title"
-                value={formData.primaryContact.jobTitle}
-                onChange={(e) => setFormData({
-                  ...formData,
-                  primaryContact: { ...formData.primaryContact, jobTitle: e.target.value }
-                })}
-              />
-            </Grid>
           </Grid>
         </DialogContent>
         <DialogActions>
@@ -692,13 +742,18 @@ export default function Organizations() {
       <Dialog open={detailOpen} onClose={() => setDetailOpen(false)} maxWidth="lg" fullWidth>
         <DialogTitle>Organization Details</DialogTitle>
         <DialogContent>
+          {error && (
+            <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
+              {error}
+            </Alert>
+          )}
           {selectedOrg && (
             <Grid container spacing={2} sx={{ mt: 1 }}>
               <Grid item xs={12} sm={6}>
                 <TextField
                   fullWidth
                   label="Name"
-                  value={selectedOrg.organization?.name || ''}
+                  value={selectedOrg.organization?.name || selectedOrg.name || ''}
                   InputProps={{ readOnly: true }}
                 />
               </Grid>
@@ -706,7 +761,7 @@ export default function Organizations() {
                 <TextField
                   fullWidth
                   label="Type"
-                  value={selectedOrg.organization?.type || ''}
+                  value={selectedOrg.organization?.type || selectedOrg.type || ''}
                   InputProps={{ readOnly: true }}
                 />
               </Grid>
@@ -714,15 +769,47 @@ export default function Organizations() {
                 <TextField
                   fullWidth
                   label="Segment"
-                  value={selectedOrg.organization?.segment || ''}
+                  value={selectedOrg.organization?.segment || selectedOrg.segment || 'N/A'}
                   InputProps={{ readOnly: true }}
                 />
               </Grid>
               <Grid item xs={12} sm={6}>
                 <TextField
                   fullWidth
-                  label="Primary Contact"
-                  value={selectedOrg.organization?.primaryContact?.name || ''}
+                  label="Status"
+                  value={selectedOrg.organization?.status || selectedOrg.status || 'N/A'}
+                  InputProps={{ readOnly: true }}
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="Primary Contact Name"
+                  value={selectedOrg.organization?.primaryContact?.name || selectedOrg.primaryContact?.name || ''}
+                  InputProps={{ readOnly: true }}
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="Primary Contact Email"
+                  value={selectedOrg.organization?.primaryContact?.email || selectedOrg.primaryContact?.email || ''}
+                  InputProps={{ readOnly: true }}
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="Primary Contact Phone"
+                  value={selectedOrg.organization?.primaryContact?.phone || selectedOrg.primaryContact?.phone || ''}
+                  InputProps={{ readOnly: true }}
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="Unique Code"
+                  value={selectedOrg.organization?.uniqueCode || selectedOrg.uniqueCode || 'N/A'}
                   InputProps={{ readOnly: true }}
                 />
               </Grid>
@@ -730,11 +817,12 @@ export default function Organizations() {
                 <Typography variant="h6" gutterBottom>
                   Custom Packages
                 </Typography>
-                {selectedOrg.organization?.customPackages?.length > 0 ? (
+                {(selectedOrg.organization?.customPackages?.length > 0 || selectedOrg.customPackages?.length > 0) ? (
                   (() => {
                     // Remove duplicates using Set
+                    const packages = selectedOrg.organization?.customPackages || selectedOrg.customPackages || [];
                     const seen = new Set();
-                    const uniquePackages = selectedOrg.organization.customPackages.filter((pkg) => {
+                    const uniquePackages = packages.filter((pkg) => {
                       const id = pkg._id?.toString() || pkg.id?.toString() || JSON.stringify(pkg);
                       if (seen.has(id)) {
                         return false;
@@ -767,8 +855,8 @@ export default function Organizations() {
                 <Typography variant="h6" gutterBottom>
                   Organization Users
                 </Typography>
-                {selectedOrg.orgUsers?.length > 0 ? (
-                  selectedOrg.orgUsers.map((orgUser, idx) => (
+                {(selectedOrg.orgUsers?.length > 0 || selectedOrg.schoolUsers?.length > 0) ? (
+                  (selectedOrg.orgUsers || selectedOrg.schoolUsers || []).map((orgUser, idx) => (
                     <Box key={idx} sx={{ mb: 1, p: 1, bgcolor: '#f5f5f5', borderRadius: 1 }}>
                       <Typography><strong>Name:</strong> {orgUser.userId?.name || 'N/A'}</Typography>
                       <Typography><strong>Email:</strong> {orgUser.userId?.email || 'N/A'}</Typography>
@@ -786,27 +874,46 @@ export default function Organizations() {
         </DialogActions>
       </Dialog>
 
-      <Dialog open={deleteOpen} onClose={handleCloseDelete}>
+      <Dialog open={deleteOpen} onClose={handleCloseDelete} maxWidth="sm" fullWidth>
         <DialogTitle>Delete Organization</DialogTitle>
         <DialogContent>
-          <Typography>
-            Are you sure you want to delete <strong>{orgToDelete?.name}</strong>? This action cannot be undone.
-            <br />
-            <br />
-            This will also delete:
-            <ul>
-              <li>All associated organization users</li>
-              <li>All custom packages for this organization</li>
-              <li>Organization references in leads</li>
-            </ul>
-          </Typography>
+          {deleteSuccess ? (
+            <Alert severity="success" sx={{ mb: 2 }}>
+              Organization <strong>{orgToDelete?.name}</strong> has been deleted successfully!
+            </Alert>
+          ) : deleteError ? (
+            <Alert severity="error" sx={{ mb: 2 }} onClose={() => setDeleteError(null)}>
+              {deleteError}
+            </Alert>
+          ) : null}
+          
+          {!deleteSuccess && (
+            <Typography>
+              Are you sure you want to delete <strong>{orgToDelete?.name}</strong>? This action cannot be undone.
+              <br />
+              <br />
+              This will also delete:
+              <ul>
+                <li>All associated organization users</li>
+                <li>All custom packages for this organization</li>
+                <li>Organization references in leads</li>
+              </ul>
+            </Typography>
+          )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleCloseDelete} disabled={deleting}>
-            Cancel
-          </Button>
-          <Button onClick={handleConfirmDelete} color="error" variant="contained" disabled={deleting}>
-            {deleting ? 'Deleting...' : 'Delete'}
+          {!deleteSuccess && (
+            <Button onClick={handleCloseDelete} disabled={deleting}>
+              Cancel
+            </Button>
+          )}
+          <Button 
+            onClick={deleteSuccess ? handleCloseDelete : handleConfirmDelete} 
+            color={deleteSuccess ? "primary" : "error"} 
+            variant="contained" 
+            disabled={deleting}
+          >
+            {deleting ? 'Deleting...' : deleteSuccess ? 'Close' : 'Delete'}
           </Button>
         </DialogActions>
       </Dialog>

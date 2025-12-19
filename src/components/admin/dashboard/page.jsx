@@ -78,10 +78,7 @@ export default function AdminDashboard() {
   }, []);
 
   const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'EUR',
-    }).format(amount || 0);
+    return `€ ${(amount || 0).toFixed(2)}`;
   };
 
   const formatDate = (date) => {

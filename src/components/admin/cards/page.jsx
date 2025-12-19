@@ -23,19 +23,15 @@ import {
   CircularProgress,
   Alert,
   Grid,
-  Accordion,
-  AccordionSummary,
-  AccordionDetails,
   Divider,
+  Snackbar,
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
 import AttachFileIcon from '@mui/icons-material/AttachFile';
 import CloseIcon from '@mui/icons-material/Close';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import VisibilityIcon from '@mui/icons-material/Visibility';
-import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import axios from 'axios';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
@@ -65,12 +61,7 @@ function getApiInstance() {
 
 // Helper function to create initial question structure
 const createInitialQuestion = () => ({
-  title: '',
   description: '', // This is the question itself
-  category: '',
-  tags: [],
-  targetAudiences: [],
-  visibility: 'public',
   answers: [
     { text: '', scoring: 0 },
     { text: '', scoring: 0 },
@@ -81,20 +72,14 @@ const createInitialQuestion = () => ({
   attachments: []
 });
 
-// Helper function to create initial level structure with 30 questions
-const createInitialLevel = (levelNumber) => ({
-  levelNumber: levelNumber,
-  questions: Array.from({ length: 30 }, () => createInitialQuestion())
-});
-
-// Helper function to create initial form data with 3 levels
+// Helper function to create initial form data
 const createInitialFormData = () => ({
   title: '',
-  levels: [
-    createInitialLevel(1),
-    createInitialLevel(2),
-    createInitialLevel(3)
-  ]
+  category: '',
+  visibility: 'public',
+  targetAudiences: [],
+  tags: [],
+  question: createInitialQuestion() // Single question object
 });
 
 export default function Cards() {
@@ -105,11 +90,9 @@ export default function Cards() {
   const [editing, setEditing] = useState(null);
   const [formData, setFormData] = useState(createInitialFormData());
   const [uploading, setUploading] = useState({});
-  const [expandedLevel, setExpandedLevel] = useState([]); // No levels expanded by default to improve performance
-  const [expandedQuestion, setExpandedQuestion] = useState({});
-  const [expandedCardRows, setExpandedCardRows] = useState({}); // Track which card rows are expanded
   const [viewingCard, setViewingCard] = useState(null); // Card being viewed in view mode
   const [confirmDialog, setConfirmDialog] = useState({ open: false, title: '', message: '', onConfirm: null });
+  const [successMessage, setSuccessMessage] = useState(null);
 
   const formDataRef = useRef(formData);
   useEffect(() => {
@@ -138,40 +121,80 @@ export default function Cards() {
   const handleOpen = (card = null) => {
     if (card) {
       setEditing(card);
-      // Convert card data to form structure - preserve existing levels and questions
-      const cardLevels = card.levels || [];
-      const levels = cardLevels.map((level) => {
-        const questions = (level.questions || []).map(q => {
-          // Migrate questionText to description if needed
-          const questionDesc = q.description || q.questionText || '';
-          return {
-            title: q.title || '',
-            description: questionDesc,
-            category: q.category || '',
-            tags: q.tags || [],
-            targetAudiences: q.targetAudiences || [],
-            visibility: q.visibility || 'public',
-            answers: q.answers && q.answers.length === 4
-              ? q.answers
-              : [
-                  { text: '', scoring: 0 },
-                  { text: '', scoring: 0 },
-                  { text: '', scoring: 0 },
-                  { text: '', scoring: 0 }
-                ],
-            feedback: q.feedback || '',
-            attachments: q.attachments || []
-          };
-        });
-        
-        return {
-          levelNumber: level.levelNumber || 1,
-          questions: questions
+      // Convert card data to form structure - migrate from old structure if needed
+      let question = null;
+      
+      // If card has new structure (single question object)
+      if (card.question) {
+        const questionDesc = card.question.description || card.question.questionText || '';
+        question = {
+          description: questionDesc,
+          answers: card.question.answers && card.question.answers.length === 4
+            ? card.question.answers
+            : [
+                { text: '', scoring: 0 },
+                { text: '', scoring: 0 },
+                { text: '', scoring: 0 },
+                { text: '', scoring: 0 }
+              ],
+          feedback: card.question.feedback || '',
+          attachments: card.question.attachments || []
         };
-      });
+      } 
+      // If card has old structure (questions array), take first one
+      else if (card.questions && Array.isArray(card.questions) && card.questions.length > 0) {
+        const q = card.questions[0];
+        const questionDesc = q.description || q.questionText || '';
+        question = {
+          description: questionDesc,
+          answers: q.answers && q.answers.length === 4
+            ? q.answers
+            : [
+                { text: '', scoring: 0 },
+                { text: '', scoring: 0 },
+                { text: '', scoring: 0 },
+                { text: '', scoring: 0 }
+              ],
+          feedback: q.feedback || '',
+          attachments: q.attachments || []
+        };
+      }
+      // If card has old structure (levels), migrate first question
+      else if (card.levels && Array.isArray(card.levels)) {
+        for (const level of card.levels) {
+          if (level.questions && Array.isArray(level.questions) && level.questions.length > 0) {
+            const q = level.questions[0];
+            const questionDesc = q.description || q.questionText || '';
+            question = {
+              description: questionDesc,
+              answers: q.answers && q.answers.length === 4
+                ? q.answers
+                : [
+                    { text: '', scoring: 0 },
+                    { text: '', scoring: 0 },
+                    { text: '', scoring: 0 },
+                    { text: '', scoring: 0 }
+                  ],
+              feedback: q.feedback || '',
+              attachments: q.attachments || []
+            };
+            break;
+          }
+        }
+      }
+      
+      // If no question found, create empty one
+      if (!question) {
+        question = createInitialQuestion();
+      }
+      
       setFormData({
         title: card.title || '',
-        levels: levels
+        category: card.category || '',
+        visibility: card.visibility || 'public',
+        targetAudiences: card.targetAudiences || [],
+        tags: card.tags || [],
+        question: question
       });
     } else {
       setEditing(null);
@@ -184,8 +207,6 @@ export default function Cards() {
     setOpen(false);
     setEditing(null);
     setFormData(createInitialFormData());
-    setExpandedLevel([]);
-    setExpandedQuestion({});
     setError(null);
   };
 
@@ -198,42 +219,39 @@ export default function Cards() {
     try {
       const latestFormData = formDataRef.current;
       
-      // Filter out empty questions - only include questions that have both title AND description
-      // If a question has partial data, we'll save it but it won't be "complete"
-      const cleanedLevels = latestFormData.levels.map(level => {
-        const validQuestions = level.questions
-          .filter(q => {
-            // Only include questions that have BOTH title AND description (complete questions)
-            // Empty questions are filtered out
-            return q.title?.trim() && q.description?.trim();
-          })
-          .map(q => {
-            // Ensure answers array has 4 items
-            const answers = q.answers && q.answers.length === 4
-              ? q.answers
-              : [
-                  { text: q.answers?.[0]?.text || '', scoring: q.answers?.[0]?.scoring || 0 },
-                  { text: q.answers?.[1]?.text || '', scoring: q.answers?.[1]?.scoring || 0 },
-                  { text: q.answers?.[2]?.text || '', scoring: q.answers?.[2]?.scoring || 0 },
-                  { text: q.answers?.[3]?.text || '', scoring: q.answers?.[3]?.scoring || 0 }
-                ];
-            
-            return {
-              ...q,
-              answers: answers
-            };
-          });
-        
-        // Only include levels that have at least one valid question, or keep empty levels
-        return {
-          ...level,
-          questions: validQuestions
-        };
-      }).filter(level => level.questions.length > 0); // Remove levels with no questions
+      // Validate and prepare question
+      const q = latestFormData.question || {};
+      
+      if (!q.description?.trim()) {
+        setError('Question description is required');
+        return;
+      }
+      
+      // Ensure answers array has 4 items
+      const answers = q.answers && q.answers.length === 4
+        ? q.answers
+        : [
+            { text: q.answers?.[0]?.text || '', scoring: q.answers?.[0]?.scoring || 0 },
+            { text: q.answers?.[1]?.text || '', scoring: q.answers?.[1]?.scoring || 0 },
+            { text: q.answers?.[2]?.text || '', scoring: q.answers?.[2]?.scoring || 0 },
+            { text: q.answers?.[3]?.text || '', scoring: q.answers?.[3]?.scoring || 0 }
+          ];
+      
+      // Prepare question object with required fields
+      const question = {
+        description: q.description.trim(),
+        answers: answers,
+        feedback: q.feedback || '',
+        attachments: q.attachments || []
+      };
       
       const payload = {
         title: latestFormData.title.trim(),
-        levels: cleanedLevels // Can be empty array - that's fine!
+        category: latestFormData.category || '',
+        visibility: latestFormData.visibility || 'public',
+        targetAudiences: latestFormData.targetAudiences || [],
+        tags: latestFormData.tags || [],
+        question: question
       };
 
       const api = getApiInstance();
@@ -284,6 +302,7 @@ export default function Cards() {
           await api.delete(`/cards/${id}`);
           fetchCards();
           setConfirmDialog({ open: false, title: '', message: '', onConfirm: null });
+          setSuccessMessage('Card deleted successfully!');
         } catch (err) {
           console.error('Error deleting card:', err);
           setError(err.response?.data?.error || 'Failed to delete card');
@@ -293,159 +312,50 @@ export default function Cards() {
     });
   };
 
-  const handleQuestionFieldChange = (levelIndex, questionIndex, field, value) => {
-    setFormData(prev => {
-      const newLevels = [...prev.levels];
-      const newQuestions = [...newLevels[levelIndex].questions];
-      newQuestions[questionIndex] = {
-        ...newQuestions[questionIndex],
+  const handleQuestionFieldChange = (field, value) => {
+    setFormData(prev => ({
+      ...prev,
+      question: {
+        ...prev.question,
         [field]: value
-      };
-      newLevels[levelIndex] = {
-        ...newLevels[levelIndex],
-        questions: newQuestions
-      };
-      return {
-        ...prev,
-        levels: newLevels
-      };
-    });
+      }
+    }));
   };
 
-  const handleAddQuestionTag = (levelIndex, questionIndex, tag) => {
-    const question = formData.levels[levelIndex].questions[questionIndex];
-    if (tag.trim() && !question.tags.includes(tag.trim())) {
-      handleQuestionFieldChange(levelIndex, questionIndex, 'tags', [...question.tags, tag.trim()]);
+
+  const handleAddTag = (tag) => {
+    if (tag.trim() && !formData.tags.includes(tag.trim())) {
+      setFormData({ ...formData, tags: [...formData.tags, tag.trim()] });
     }
   };
 
-  const handleRemoveQuestionTag = (levelIndex, questionIndex, tag) => {
-    const question = formData.levels[levelIndex].questions[questionIndex];
-    handleQuestionFieldChange(levelIndex, questionIndex, 'tags', question.tags.filter(t => t !== tag));
+  const handleRemoveTag = (tag) => {
+    setFormData({ ...formData, tags: formData.tags.filter(t => t !== tag) });
   };
 
-  const handleDeleteLevel = (levelIndex) => {
-    setConfirmDialog({
-      open: true,
-      title: 'Delete Level',
-      message: 'Are you sure you want to delete this level? All questions in this level will be removed. This action cannot be undone.',
-      onConfirm: () => {
-        setFormData(prev => ({
-          ...prev,
-          levels: prev.levels.filter((_, idx) => idx !== levelIndex).map((level, idx) => ({
-            ...level,
-            levelNumber: idx + 1
-          }))
-        }));
-        setExpandedLevel(prev => prev.filter(idx => idx !== levelIndex).map(idx => idx > levelIndex ? idx - 1 : idx));
-        setConfirmDialog({ open: false, title: '', message: '', onConfirm: null });
-      }
-    });
-  };
-
-  const handleDeleteQuestion = (levelIndex, questionIndex) => {
-    setConfirmDialog({
-      open: true,
-      title: 'Delete Question',
-      message: 'Are you sure you want to delete this question? This action cannot be undone.',
-      onConfirm: () => {
-        setFormData(prev => {
-          const newLevels = [...prev.levels];
-          const newQuestions = newLevels[levelIndex].questions.filter((_, idx) => idx !== questionIndex);
-          newLevels[levelIndex] = {
-            ...newLevels[levelIndex],
-            questions: newQuestions
-          };
-          return {
-            ...prev,
-            levels: newLevels
-          };
-        });
-        // Remove from expanded questions
-        const key = `${levelIndex}-${questionIndex}`;
-        setExpandedQuestion(prev => {
-          const newExpanded = {};
-          Object.keys(prev).forEach(k => {
-            if (k !== key) {
-              const [lIdx, qIdx] = k.split('-').map(Number);
-              if (lIdx === levelIndex && qIdx > questionIndex) {
-                newExpanded[`${lIdx}-${qIdx - 1}`] = prev[k];
-              } else if (lIdx !== levelIndex) {
-                newExpanded[k] = prev[k];
-              }
-            }
-          });
-          return newExpanded;
-        });
-        setConfirmDialog({ open: false, title: '', message: '', onConfirm: null });
-      }
-    });
-  };
-
-  const handleQuestionChange = (levelIndex, questionIndex, field, value) => {
+  const handleAnswerChange = (answerIndex, field, value) => {
     setFormData(prev => {
-      const newLevels = [...prev.levels];
-      const newQuestions = [...newLevels[levelIndex].questions];
-      newQuestions[questionIndex] = {
-        ...newQuestions[questionIndex],
-        [field]: value
-      };
-      newLevels[levelIndex] = {
-        ...newLevels[levelIndex],
-        questions: newQuestions
-      };
-      return {
-        ...prev,
-        levels: newLevels
-      };
-    });
-  };
-
-  const handleAnswerChange = (levelIndex, questionIndex, answerIndex, field, value) => {
-    setFormData(prev => {
-      const newLevels = [...prev.levels];
-      const newQuestions = [...newLevels[levelIndex].questions];
-      const newAnswers = [...newQuestions[questionIndex].answers];
+      const newAnswers = [...(prev.question?.answers || [])];
       newAnswers[answerIndex] = {
         ...newAnswers[answerIndex],
         [field]: value
       };
-      newQuestions[questionIndex] = {
-        ...newQuestions[questionIndex],
-        answers: newAnswers
-      };
-      newLevels[levelIndex] = {
-        ...newLevels[levelIndex],
-        questions: newQuestions
-      };
       return {
         ...prev,
-        levels: newLevels
+        question: {
+          ...prev.question,
+          answers: newAnswers
+        }
       };
     });
   };
 
-  const handleLevelToggle = (levelIndex) => {
-    setExpandedLevel(prev => 
-      prev.includes(levelIndex) 
-        ? prev.filter(i => i !== levelIndex)
-        : [...prev, levelIndex]
-    );
-  };
 
-  const handleQuestionToggle = (levelIndex, questionIndex) => {
-    const key = `${levelIndex}-${questionIndex}`;
-    setExpandedQuestion(prev => ({
-      ...prev,
-      [key]: !prev[key]
-    }));
-  };
-
-  const handleFileChange = async (levelIndex, questionIndex, e) => {
+  const handleFileChange = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
-    const uploadKey = `${levelIndex}-${questionIndex}`;
+    const uploadKey = 'question';
     try {
       setUploading(prev => ({ ...prev, [uploadKey]: true }));
       const formDataUpload = new FormData();
@@ -469,7 +379,7 @@ export default function Cards() {
 
       if (editing && editing._id) {
         try {
-          await api.post(`/cards/${editing._id}/levels/${levelIndex}/questions/${questionIndex}/attachments`, {
+          await api.post(`/cards/${editing._id}/question/attachments`, {
             type: newAttachment.type,
             url: newAttachment.url,
             title: newAttachment.title
@@ -483,8 +393,8 @@ export default function Cards() {
           setError(err.response?.data?.error || 'Failed to save attachment');
         }
       } else {
-        handleQuestionChange(levelIndex, questionIndex, 'attachments', [
-          ...formData.levels[levelIndex].questions[questionIndex].attachments,
+        handleQuestionFieldChange('attachments', [
+          ...(formData.question?.attachments || []),
           newAttachment
         ]);
       }
@@ -496,7 +406,7 @@ export default function Cards() {
     }
   };
 
-  const handleUrlChange = async (levelIndex, questionIndex, url) => {
+  const handleUrlChange = async (url) => {
     if (!url || !url.trim()) return;
 
     let title = 'External Link';
@@ -516,9 +426,9 @@ export default function Cards() {
 
     if (editing && editing._id) {
       try {
-        setUploading(prev => ({ ...prev, [`${levelIndex}-${questionIndex}`]: true }));
+        setUploading(prev => ({ ...prev, 'question': true }));
         const api = getApiInstance();
-        await api.post(`/cards/${editing._id}/levels/${levelIndex}/questions/${questionIndex}/attachments`, {
+        await api.post(`/cards/${editing._id}/question/attachments`, {
           type: newAttachment.type,
           url: newAttachment.url,
           title: newAttachment.title
@@ -529,25 +439,25 @@ export default function Cards() {
         console.error('Error saving attachment:', err);
         setError(err.response?.data?.error || 'Failed to save attachment');
       } finally {
-        setUploading(prev => ({ ...prev, [`${levelIndex}-${questionIndex}`]: false }));
+        setUploading(prev => ({ ...prev, 'question': false }));
       }
     } else {
-      handleQuestionChange(levelIndex, questionIndex, 'attachments', [
-        ...formData.levels[levelIndex].questions[questionIndex].attachments,
+      handleQuestionFieldChange('attachments', [
+        ...(formData.question?.attachments || []),
         newAttachment
       ]);
     }
   };
 
-  const handleRemoveAttachment = async (levelIndex, questionIndex, attachmentIndex) => {
-    const question = formData.levels[levelIndex].questions[questionIndex];
-    const attachment = question.attachments[attachmentIndex];
+  const handleRemoveAttachment = async (attachmentIndex) => {
+    const question = formData.question;
+    const attachment = question?.attachments?.[attachmentIndex];
     if (!attachment) return;
 
     if (editing && editing._id && attachment._id) {
       try {
         const api = getApiInstance();
-        await api.delete(`/cards/${editing._id}/levels/${levelIndex}/questions/${questionIndex}/attachments/${attachment._id}`);
+        await api.delete(`/cards/${editing._id}/question/attachments/${attachment._id}`);
         const cardResponse = await api.get(`/cards/${editing._id}`);
         handleOpen(cardResponse.data);
       } catch (err) {
@@ -555,8 +465,8 @@ export default function Cards() {
         setError(err.response?.data?.error || 'Failed to remove attachment');
       }
     } else {
-      handleQuestionChange(levelIndex, questionIndex, 'attachments', 
-        question.attachments.filter((_, i) => i !== attachmentIndex)
+      handleQuestionFieldChange('attachments', 
+        (question?.attachments || []).filter((_, i) => i !== attachmentIndex)
       );
     }
   };
@@ -586,10 +496,9 @@ export default function Cards() {
         <Table>
           <TableHead>
             <TableRow>
-              <TableCell width="50px"></TableCell>
               <TableCell>Title</TableCell>
-              <TableCell>Levels</TableCell>
-              <TableCell>Total Questions</TableCell>
+              <TableCell>Category</TableCell>
+              <TableCell>Visibility</TableCell>
               <TableCell>Last Updated</TableCell>
               <TableCell align="right">Actions</TableCell>
             </TableRow>
@@ -597,122 +506,64 @@ export default function Cards() {
           <TableBody>
             {cards.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} align="center">
+                <TableCell colSpan={5} align="center">
                   <Typography color="text.secondary">No cards found</Typography>
                 </TableCell>
               </TableRow>
             ) : (
               cards.map((card) => {
-                const isExpanded = expandedCardRows[card._id] || false;
-                const totalLevels = card.levels?.length || 0;
-                const totalQuestions = card.levels?.reduce((sum, level) => sum + (level.questions?.length || 0), 0) || 0;
-                const filledQuestions = card.levels?.reduce((sum, level) => 
-                  sum + (level.questions?.filter(q => q.description?.trim()).length || 0), 0) || 0;
-                
                 return (
-                  <React.Fragment key={card._id}>
-                    <TableRow>
-                      <TableCell>
-                        <IconButton
-                          size="small"
-                          onClick={() => setExpandedCardRows(prev => ({
-                            ...prev,
-                            [card._id]: !prev[card._id]
-                          }))}
-                        >
-                          {isExpanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
-                        </IconButton>
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="body1" fontWeight="medium">
-                          {card.title}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
-                        <Chip 
-                          label={`${totalLevels} Levels`} 
-                          color="primary" 
-                          size="small" 
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="body2">
-                          {filledQuestions} / {totalQuestions} Questions
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="body2" color="text.secondary">
-                          {new Date(card.updatedAt).toLocaleDateString()}
-                        </Typography>
-                      </TableCell>
-                      <TableCell align="right">
-                        <IconButton 
-                          size="small" 
-                          onClick={() => setViewingCard(card)}
-                          color="info"
-                          title="View"
-                        >
-                          <VisibilityIcon />
-                        </IconButton>
-                        <IconButton 
-                          size="small" 
-                          onClick={() => handleOpen(card)}
-                          color="primary"
-                          title="Edit"
-                        >
-                          <EditIcon />
-                        </IconButton>
-                        <IconButton 
-                          size="small" 
-                          onClick={() => handleDelete(card._id)}
-                          color="error"
-                          title="Delete"
-                        >
-                          <DeleteIcon />
-                        </IconButton>
-                      </TableCell>
-                    </TableRow>
-                    {isExpanded && (
-                      <TableRow>
-                        <TableCell colSpan={6} sx={{ py: 2, backgroundColor: '#f5f5f5' }}>
-                          <Box>
-                            <Typography variant="subtitle1" fontWeight="bold" sx={{ mb: 2 }}>
-                              Card Details
-                            </Typography>
-                            <Grid container spacing={2}>
-                              <Grid item xs={12} sm={6}>
-                                <Typography variant="body2" color="text.secondary">Title:</Typography>
-                                <Typography variant="body1">{card.title}</Typography>
-                              </Grid>
-                              <Grid item xs={12} sm={6}>
-                                <Typography variant="body2" color="text.secondary">Created:</Typography>
-                                <Typography variant="body1">
-                                  {new Date(card.createdAt).toLocaleDateString()}
-                                </Typography>
-                              </Grid>
-                              <Grid item xs={12}>
-                                <Divider sx={{ my: 1 }} />
-                                <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 'bold' }}>
-                                  Levels Breakdown:
-                                </Typography>
-                                {card.levels?.map((level, idx) => {
-                                  const levelQuestions = level.questions?.length || 0;
-                                  const filledLevelQuestions = level.questions?.filter(q => q.description?.trim()).length || 0;
-                                  return (
-                                    <Box key={idx} sx={{ mb: 1, p: 1, bgcolor: 'white', borderRadius: 1 }}>
-                                      <Typography variant="body2">
-                                        <strong>Level {level.levelNumber}:</strong> {filledLevelQuestions} / {levelQuestions} questions
-                                      </Typography>
-                                    </Box>
-                                  );
-                                })}
-                              </Grid>
-                            </Grid>
-                          </Box>
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </React.Fragment>
+                  <TableRow key={card._id}>
+                    <TableCell>
+                      <Typography variant="body1" fontWeight="medium">
+                        {card.title}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="body2" color="text.secondary">
+                        {card.category || '-'}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Chip
+                        label={card.visibility || 'public'}
+                        size="small"
+                        color={card.visibility === 'public' ? 'success' : 'default'}
+                        variant="outlined"
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="body2" color="text.secondary">
+                        {new Date(card.updatedAt).toLocaleDateString()}
+                      </Typography>
+                    </TableCell>
+                    <TableCell align="right">
+                      <IconButton 
+                        size="small" 
+                        onClick={() => setViewingCard(card)}
+                        color="info"
+                        title="View"
+                      >
+                        <VisibilityIcon />
+                      </IconButton>
+                      <IconButton 
+                        size="small" 
+                        onClick={() => handleOpen(card)}
+                        color="primary"
+                        title="Edit"
+                      >
+                        <EditIcon />
+                      </IconButton>
+                      <IconButton 
+                        size="small" 
+                        onClick={() => handleDelete(card._id)}
+                        color="error"
+                        title="Delete"
+                      >
+                        <DeleteIcon />
+                      </IconButton>
+                    </TableCell>
+                  </TableRow>
                 );
               })
             )}
@@ -740,330 +591,214 @@ export default function Cards() {
               />
             </Grid>
 
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label="Category"
+                value={formData.category}
+                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                helperText="Card category"
+              />
+            </Grid>
+
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                select
+                label="Visibility"
+                value={formData.visibility}
+                onChange={(e) => setFormData({ ...formData, visibility: e.target.value })}
+              >
+                <MenuItem value="public">Public</MenuItem>
+                <MenuItem value="internal">Internal</MenuItem>
+                <MenuItem value="custom_only">Custom Only</MenuItem>
+              </TextField>
+            </Grid>
+
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                select
+                SelectProps={{ multiple: true }}
+                label="Target Audiences"
+                value={formData.targetAudiences || []}
+                onChange={(e) => {
+                  setFormData({ ...formData, targetAudiences: e.target.value });
+                }}
+                helperText="Select one or more target audiences"
+              >
+                <MenuItem value="B2C">B2C</MenuItem>
+                <MenuItem value="B2B">B2B</MenuItem>
+                <MenuItem value="B2E">B2E</MenuItem>
+              </TextField>
+            </Grid>
+
+            <Grid item xs={12}>
+              <Typography variant="body2" sx={{ mb: 1 }}>Tags</Typography>
+              <Box display="flex" gap={1} alignItems="center" flexWrap="wrap">
+                {formData.tags?.map((tag, idx) => (
+                  <Chip
+                    key={idx}
+                    label={tag}
+                    onDelete={() => handleRemoveTag(tag)}
+                    size="small"
+                  />
+                ))}
+                <TextField
+                  size="small"
+                  placeholder="Add tag"
+                  onKeyPress={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      if (e.target.value.trim()) {
+                        handleAddTag(e.target.value);
+                        e.target.value = '';
+                      }
+                    }
+                  }}
+                  sx={{ width: 150 }}
+                />
+                <Button 
+                  size="small" 
+                  variant="outlined"
+                  onClick={(e) => {
+                    const input = e.target.previousElementSibling?.querySelector('input');
+                    if (input?.value?.trim()) {
+                      handleAddTag(input.value);
+                      input.value = '';
+                    }
+                  }}
+                >
+                  Add
+                </Button>
+              </Box>
+            </Grid>
+
             <Grid item xs={12}>
               <Divider sx={{ my: 2 }} />
-              <Box display="flex" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
-                <Typography variant="h5">Levels</Typography>
-                <Box display="flex" gap={1} alignItems="center">
-                  <Chip label={`${formData.levels.length} Levels`} color="primary" />
-                  {formData.levels.length < 3 && (
-                    <Button
-                      size="small"
-                      variant="outlined"
-                      startIcon={<AddIcon />}
-                      onClick={() => {
-                        const newLevelNumber = formData.levels.length + 1;
-                        setFormData(prev => ({
-                          ...prev,
-                          levels: [...prev.levels, createInitialLevel(newLevelNumber)]
-                        }));
-                        setExpandedLevel(prev => [...prev, formData.levels.length]);
-                      }}
-                    >
-                      Add Level
-                    </Button>
-                  )}
-                </Box>
-              </Box>
+              <Typography variant="h5" sx={{ mb: 2 }}>Card Information</Typography>
               
-              {formData.levels.map((level, levelIndex) => (
-                <Accordion
-                  key={levelIndex}
-                  expanded={expandedLevel.includes(levelIndex)}
-                  onChange={() => handleLevelToggle(levelIndex)}
-                  sx={{ mb: 2 }}
-                >
-                  <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                    <Box display="flex" justifyContent="space-between" alignItems="center" sx={{ width: '100%', mr: 2 }}>
-                      <Typography variant="h6">Level {level.levelNumber} - {level.questions.filter(q => q.description?.trim()).length} Questions</Typography>
-                      <IconButton
-                        size="small"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeleteLevel(levelIndex);
-                        }}
-                        color="error"
-                      >
-                        <DeleteIcon fontSize="small" />
-                      </IconButton>
-                    </Box>
-                  </AccordionSummary>
-                  <AccordionDetails>
-                    <Box sx={{ mb: 2, display: 'flex', justifyContent: 'flex-end' }}>
-                      <Button
-                        size="small"
-                        variant="outlined"
-                        startIcon={<AddIcon />}
-                        onClick={() => {
-                          setFormData(prev => {
-                            const newLevels = [...prev.levels];
-                            const newQuestions = [...newLevels[levelIndex].questions, createInitialQuestion()];
-                            newLevels[levelIndex] = {
-                              ...newLevels[levelIndex],
-                              questions: newQuestions
-                            };
-                            return {
-                              ...prev,
-                              levels: newLevels
-                            };
-                          });
-                          // Auto-expand the new question
-                          const newQuestionIndex = level.questions.length;
-                          setExpandedQuestion(prev => ({
-                            ...prev,
-                            [`${levelIndex}-${newQuestionIndex}`]: true
-                          }));
-                        }}
-                      >
-                        Add Question
-                      </Button>
-                    </Box>
-                    {expandedLevel.includes(levelIndex) ? (
-                      level.questions.map((question, questionIndex) => {
-                        const isQuestionExpanded = expandedQuestion[`${levelIndex}-${questionIndex}`] || false;
-                        return (
-                          <Accordion
-                            key={questionIndex}
-                            expanded={isQuestionExpanded}
-                            onChange={() => handleQuestionToggle(levelIndex, questionIndex)}
-                            sx={{ mb: 1 }}
+              {/* Single question form - always visible, no accordion */}
+              {formData.question && (
+                <Grid container spacing={2}>
+                  <Grid item xs={12}>
+                    <Divider sx={{ mb: 2 }} />
+                    <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 'bold' }}>Question</Typography>
+                  </Grid>
+                  <Grid item xs={12}>
+                    <TextField
+                      fullWidth
+                      label="Question *"
+                      value={formData.question.description || ''}
+                      onChange={(e) => handleQuestionFieldChange('description', e.target.value)}
+                      multiline
+                      rows={3}
+                      required
+                      placeholder="Enter your question here..."
+                      helperText="This is the actual question text"
+                    />
+                  </Grid>
+                  
+                  <Grid item xs={12}>
+                    <Typography variant="subtitle2" sx={{ mb: 1 }}>Answers (4 Required)</Typography>
+                    {(formData.question.answers || []).map((answer, answerIndex) => (
+                      <Box key={answerIndex} sx={{ mb: 2, p: 1.5, border: '1px solid #e0e0e0', borderRadius: 1 }}>
+                        <Grid container spacing={2}>
+                          <Grid item xs={12} sm={8}>
+                            <TextField
+                              fullWidth
+                              label={`Answer ${answerIndex + 1} *`}
+                              value={answer.text || ''}
+                              onChange={(e) => handleAnswerChange(answerIndex, 'text', e.target.value)}
+                              required
+                            />
+                          </Grid>
+                          <Grid item xs={12} sm={4}>
+                            <TextField
+                              fullWidth
+                              label="Scoring *"
+                              type="number"
+                              value={answer.scoring || 0}
+                              onChange={(e) => handleAnswerChange(answerIndex, 'scoring', parseFloat(e.target.value) || 0)}
+                              inputProps={{ min: 0, step: 0.1 }}
+                              required
+                            />
+                          </Grid>
+                        </Grid>
+                      </Box>
+                    ))}
+                  </Grid>
+
+                  <Grid item xs={12}>
+                    <TextField
+                      fullWidth
+                      label="Feedback/Explanation"
+                      value={formData.question.feedback || ''}
+                      onChange={(e) => handleQuestionFieldChange('feedback', e.target.value)}
+                      multiline
+                      rows={3}
+                      placeholder="Short explanation for feedback..."
+                    />
+                  </Grid>
+
+                  <Grid item xs={12}>
+                    <Typography variant="subtitle2" sx={{ mb: 1 }}>Attachments</Typography>
+                    {(formData.question.attachments || []).map((attachment, attIndex) => (
+                      <Box key={attIndex} sx={{ mb: 1, p: 1, bgcolor: '#f5f5f5', borderRadius: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Box>
+                          <Typography variant="body2" fontWeight="bold">{attachment.title}</Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {attachment.type.toUpperCase()}
+                          </Typography>
+                        </Box>
+                        <IconButton size="small" onClick={() => handleRemoveAttachment(attIndex)}>
+                          <CloseIcon fontSize="small" />
+                        </IconButton>
+                      </Box>
+                    ))}
+                    <Box sx={{ mt: 1, p: 1.5, border: '1px dashed #ccc', borderRadius: 1 }}>
+                      <Grid container spacing={2}>
+                        <Grid item xs={12} sm={6}>
+                          <Button
+                            variant="outlined"
+                            component="label"
+                            startIcon={<AttachFileIcon />}
+                            fullWidth
+                            disabled={uploading['question']}
                           >
-                            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                              <Box display="flex" justifyContent="space-between" alignItems="center" sx={{ width: '100%', mr: 2 }}>
-                                <Typography>
-                                  Question {questionIndex + 1}: {question.title || question.description || 'New Question'}
-                                </Typography>
-                                <IconButton
-                                  size="small"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleDeleteQuestion(levelIndex, questionIndex);
-                                  }}
-                                  color="error"
-                                >
-                                  <DeleteIcon fontSize="small" />
-                                </IconButton>
-                              </Box>
-                            </AccordionSummary>
-                            {isQuestionExpanded && (
-                              <AccordionDetails>
-                                <Grid container spacing={2}>
-                                  <Grid item xs={12}>
-                                    <Divider sx={{ mb: 2 }} />
-                                    <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 'bold' }}>Question Information</Typography>
-                                  </Grid>
-                                  <Grid item xs={12}>
-                                    <TextField
-                                      fullWidth
-                                      label="Title *"
-                                      value={question.title}
-                                      onChange={(e) => handleQuestionFieldChange(levelIndex, questionIndex, 'title', e.target.value)}
-                                      required
-                                    />
-                                  </Grid>
-                                  <Grid item xs={12} sm={6}>
-                                    <TextField
-                                      fullWidth
-                                      label="Category"
-                                      value={question.category}
-                                      onChange={(e) => handleQuestionFieldChange(levelIndex, questionIndex, 'category', e.target.value)}
-                                    />
-                                  </Grid>
-                                  <Grid item xs={12} sm={6}>
-                                    <TextField
-                                      fullWidth
-                                      select
-                                      label="Visibility"
-                                      value={question.visibility}
-                                      onChange={(e) => handleQuestionFieldChange(levelIndex, questionIndex, 'visibility', e.target.value)}
-                                    >
-                                      <MenuItem value="public">Public</MenuItem>
-                                      <MenuItem value="internal">Internal</MenuItem>
-                                      <MenuItem value="custom_only">Custom Only</MenuItem>
-                                    </TextField>
-                                  </Grid>
-                                  <Grid item xs={12}>
-                                    <TextField
-                                      fullWidth
-                                      select
-                                      SelectProps={{ multiple: true }}
-                                      label="Target Audiences"
-                                      value={question.targetAudiences || []}
-                                      onChange={(e) => handleQuestionFieldChange(levelIndex, questionIndex, 'targetAudiences', e.target.value)}
-                                    >
-                                      <MenuItem value="B2C">B2C</MenuItem>
-                                      <MenuItem value="B2B">B2B</MenuItem>
-                                      <MenuItem value="B2E">B2E</MenuItem>
-                                    </TextField>
-                                  </Grid>
-                                  <Grid item xs={12}>
-                                    <Box display="flex" gap={1} alignItems="center" flexWrap="wrap">
-                                      {question.tags?.map((tag, idx) => (
-                                        <Chip
-                                          key={idx}
-                                          label={tag}
-                                          onDelete={() => handleRemoveQuestionTag(levelIndex, questionIndex, tag)}
-                                          size="small"
-                                        />
-                                      ))}
-                                      <TextField
-                                        size="small"
-                                        placeholder="Add tag"
-                                        inputRef={(input) => {
-                                          if (input) {
-                                            input._questionTagInput = { levelIndex, questionIndex };
-                                          }
-                                        }}
-                                        onKeyPress={(e) => {
-                                          if (e.key === 'Enter') {
-                                            e.preventDefault();
-                                            if (e.target.value.trim()) {
-                                              handleAddQuestionTag(levelIndex, questionIndex, e.target.value);
-                                              e.target.value = '';
-                                            }
-                                          }
-                                        }}
-                                        sx={{ width: 150 }}
-                                      />
-                                      <Button size="small" onClick={(e) => {
-                                        const input = e.target.previousElementSibling?.querySelector('input');
-                                        if (input?.value?.trim()) {
-                                          handleAddQuestionTag(levelIndex, questionIndex, input.value);
-                                          input.value = '';
-                                        }
-                                      }}>Add</Button>
-                                    </Box>
-                                  </Grid>
-                                  <Grid item xs={12}>
-                                    <Divider sx={{ my: 2 }} />
-                                    <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 'bold' }}>Question</Typography>
-                                  </Grid>
-                                  <Grid item xs={12}>
-                                    <TextField
-                                      fullWidth
-                                      label="Question *"
-                                      value={question.description}
-                                      onChange={(e) => handleQuestionFieldChange(levelIndex, questionIndex, 'description', e.target.value)}
-                                      multiline
-                                      rows={3}
-                                      required
-                                      placeholder="Enter your question here..."
-                                      helperText="This is the actual question text"
-                                    />
-                                  </Grid>
-                                  
-                                  <Grid item xs={12}>
-                                    <Typography variant="subtitle2" sx={{ mb: 1 }}>Answers (4 Required)</Typography>
-                                    {question.answers.map((answer, answerIndex) => (
-                                      <Box key={answerIndex} sx={{ mb: 2, p: 1.5, border: '1px solid #e0e0e0', borderRadius: 1 }}>
-                                        <Grid container spacing={2}>
-                                          <Grid item xs={12} sm={8}>
-                                            <TextField
-                                              fullWidth
-                                              label={`Answer ${answerIndex + 1} *`}
-                                              value={answer.text}
-                                              onChange={(e) => handleAnswerChange(levelIndex, questionIndex, answerIndex, 'text', e.target.value)}
-                                              required
-                                            />
-                                          </Grid>
-                                          <Grid item xs={12} sm={4}>
-                                            <TextField
-                                              fullWidth
-                                              label="Scoring *"
-                                              type="number"
-                                              value={answer.scoring}
-                                              onChange={(e) => handleAnswerChange(levelIndex, questionIndex, answerIndex, 'scoring', parseFloat(e.target.value) || 0)}
-                                              inputProps={{ min: 0, step: 0.1 }}
-                                              required
-                                            />
-                                          </Grid>
-                                        </Grid>
-                                      </Box>
-                                    ))}
-                                  </Grid>
-
-                                  <Grid item xs={12}>
-                                    <TextField
-                                      fullWidth
-                                      label="Feedback/Explanation"
-                                      value={question.feedback}
-                                      onChange={(e) => handleQuestionChange(levelIndex, questionIndex, 'feedback', e.target.value)}
-                                      multiline
-                                      rows={3}
-                                      placeholder="Short explanation for feedback..."
-                                    />
-                                  </Grid>
-
-                                  <Grid item xs={12}>
-                                    <Typography variant="subtitle2" sx={{ mb: 1 }}>Attachments</Typography>
-                                    {question.attachments.map((attachment, attIndex) => (
-                                      <Box key={attIndex} sx={{ mb: 1, p: 1, bgcolor: '#f5f5f5', borderRadius: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                        <Box>
-                                          <Typography variant="body2" fontWeight="bold">{attachment.title}</Typography>
-                                          <Typography variant="caption" color="text.secondary">
-                                            {attachment.type.toUpperCase()}
-                                          </Typography>
-                                        </Box>
-                                        <IconButton size="small" onClick={() => handleRemoveAttachment(levelIndex, questionIndex, attIndex)}>
-                                          <CloseIcon fontSize="small" />
-                                        </IconButton>
-                                      </Box>
-                                    ))}
-                                    <Box sx={{ mt: 1, p: 1.5, border: '1px dashed #ccc', borderRadius: 1 }}>
-                                      <Grid container spacing={2}>
-                                        <Grid item xs={12} sm={6}>
-                                          <Button
-                                            variant="outlined"
-                                            component="label"
-                                            startIcon={<AttachFileIcon />}
-                                            fullWidth
-                                            disabled={uploading[`${levelIndex}-${questionIndex}`]}
-                                          >
-                                            {uploading[`${levelIndex}-${questionIndex}`] ? 'Uploading...' : 'Upload File'}
-                                            <input
-                                              type="file"
-                                              hidden
-                                              accept="audio/*,video/*,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                                              onChange={(e) => handleFileChange(levelIndex, questionIndex, e)}
-                                            />
-                                          </Button>
-                                        </Grid>
-                                        <Grid item xs={12} sm={6}>
-                                          <TextField
-                                            fullWidth
-                                            label="External Link URL"
-                                            placeholder="https://example.com"
-                                            onBlur={(e) => {
-                                              if (e.target.value.trim()) {
-                                                handleUrlChange(levelIndex, questionIndex, e.target.value);
-                                                e.target.value = '';
-                                              }
-                                            }}
-                                            onKeyPress={(e) => {
-                                              if (e.key === 'Enter' && e.target.value.trim()) {
-                                                handleUrlChange(levelIndex, questionIndex, e.target.value);
-                                                e.target.value = '';
-                                              }
-                                            }}
-                                          />
-                                        </Grid>
-                                      </Grid>
-                                    </Box>
-                                  </Grid>
-                                </Grid>
-                              </AccordionDetails>
-                            )}
-                          </Accordion>
-                        );
-                      })
-                    ) : (
-                      <Typography variant="body2" color="text.secondary" sx={{ p: 2 }}>
-                        Click to expand and view 30 questions for this level
-                      </Typography>
-                    )}
-                  </AccordionDetails>
-                </Accordion>
-              ))}
+                            {uploading['question'] ? 'Uploading...' : 'Upload File'}
+                            <input
+                              type="file"
+                              hidden
+                              accept="audio/*,video/*,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                              onChange={handleFileChange}
+                            />
+                          </Button>
+                        </Grid>
+                        <Grid item xs={12} sm={6}>
+                          <TextField
+                            fullWidth
+                            label="External Link URL"
+                            placeholder="https://example.com"
+                            onBlur={(e) => {
+                              if (e.target.value.trim()) {
+                                handleUrlChange(e.target.value);
+                                e.target.value = '';
+                              }
+                            }}
+                            onKeyPress={(e) => {
+                              if (e.key === 'Enter' && e.target.value.trim()) {
+                                handleUrlChange(e.target.value);
+                                e.target.value = '';
+                              }
+                            }}
+                          />
+                        </Grid>
+                      </Grid>
+                    </Box>
+                  </Grid>
+                </Grid>
+              )}
             </Grid>
           </Grid>
         </DialogContent>
@@ -1094,6 +829,38 @@ export default function Cards() {
                   <Box sx={{ p: 2, bgcolor: '#f5f5f5', borderRadius: 1, mb: 2 }}>
                     <Typography variant="body2" color="text.secondary">Title:</Typography>
                     <Typography variant="body1" fontWeight="medium">{viewingCard.title}</Typography>
+                    {viewingCard.category && (
+                      <>
+                        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>Category:</Typography>
+                        <Typography variant="body2">{viewingCard.category}</Typography>
+                      </>
+                    )}
+                    {viewingCard.visibility && (
+                      <>
+                        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>Visibility:</Typography>
+                        <Typography variant="body2">{viewingCard.visibility}</Typography>
+                      </>
+                    )}
+                    {viewingCard.targetAudiences && viewingCard.targetAudiences.length > 0 && (
+                      <>
+                        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>Target Audiences:</Typography>
+                        <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', mt: 0.5 }}>
+                          {viewingCard.targetAudiences.map((aud, idx) => (
+                            <Chip key={idx} label={aud} size="small" />
+                          ))}
+                        </Box>
+                      </>
+                    )}
+                    {viewingCard.tags && viewingCard.tags.length > 0 && (
+                      <>
+                        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>Tags:</Typography>
+                        <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', mt: 0.5 }}>
+                          {viewingCard.tags.map((tag, idx) => (
+                            <Chip key={idx} label={tag} size="small" variant="outlined" />
+                          ))}
+                        </Box>
+                      </>
+                    )}
                     <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>Created:</Typography>
                     <Typography variant="body2">{new Date(viewingCard.createdAt).toLocaleString()}</Typography>
                     <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>Last Updated:</Typography>
@@ -1103,115 +870,83 @@ export default function Cards() {
 
                 <Grid item xs={12}>
                   <Divider sx={{ my: 2 }} />
-                  <Typography variant="h6" sx={{ mb: 2 }}>
-                    Levels ({viewingCard.levels?.length || 0})
+                  <Typography variant="h6" sx={{ mb: 2, fontWeight: 'bold' }}>
+                    Card
                   </Typography>
                   
-                  {viewingCard.levels?.map((level, levelIndex) => {
-                    const levelQuestions = level.questions || [];
-                    const filledQuestions = levelQuestions.filter(q => q.description?.trim()).length;
+                  {/* Support both old (questions array/levels) and new (single question) structure */}
+                  {(() => {
+                    let questionToShow = null;
+                    
+                    // New structure (single question object)
+                    if (viewingCard.question) {
+                      questionToShow = viewingCard.question;
+                    }
+                    // Old structure (questions array) - take first one
+                    else if (viewingCard.questions && Array.isArray(viewingCard.questions) && viewingCard.questions.length > 0) {
+                      questionToShow = viewingCard.questions[0];
+                    }
+                    // Old structure (levels) - migrate first question
+                    else if (viewingCard.levels && Array.isArray(viewingCard.levels)) {
+                      for (const level of viewingCard.levels) {
+                        if (level.questions && Array.isArray(level.questions) && level.questions.length > 0) {
+                          questionToShow = level.questions[0];
+                          break;
+                        }
+                      }
+                    }
+                    
+                    if (!questionToShow || (!questionToShow.description?.trim() && !questionToShow.questionText?.trim())) {
+                      return <Typography variant="body2" color="text.secondary">No question available</Typography>;
+                    }
+                    
+                    const question = questionToShow;
+                    const questionDesc = question.description || question.questionText || '';
+                    
                     return (
-                      <Accordion key={levelIndex} sx={{ mb: 2 }}>
-                        <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                          <Typography variant="subtitle1" fontWeight="medium">
-                            Level {level.levelNumber} - {filledQuestions} / {levelQuestions.length} Questions
-                          </Typography>
-                        </AccordionSummary>
-                        <AccordionDetails>
-                          {levelQuestions.map((question, questionIndex) => {
-                            if (!question.description?.trim() && !question.questionText?.trim()) return null;
-                            const questionDesc = question.description || question.questionText || '';
-                            return (
-                              <Accordion key={questionIndex} sx={{ mb: 1 }}>
-                                <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                                  <Typography>
-                                    Question {questionIndex + 1}: {question.title || questionDesc || 'Untitled'}
+                      <Grid container spacing={2}>
+                        <Grid item xs={12}>
+                          <Typography variant="subtitle2" color="text.secondary">Question:</Typography>
+                          <Typography variant="body1" sx={{ mt: 0.5 }}>{questionDesc}</Typography>
+                        </Grid>
+                        <Grid item xs={12}>
+                          <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>Answers:</Typography>
+                          {question.answers?.map((answer, ansIdx) => (
+                            <Box key={ansIdx} sx={{ mb: 1, p: 1, bgcolor: '#f9f9f9', borderRadius: 1 }}>
+                              <Typography variant="body2">
+                                <strong>Answer {ansIdx + 1}:</strong> {answer.text} 
+                                <Chip label={`Score: ${answer.scoring}`} size="small" sx={{ ml: 1 }} />
+                              </Typography>
+                            </Box>
+                          ))}
+                        </Grid>
+                        {question.feedback && (
+                          <Grid item xs={12}>
+                            <Typography variant="subtitle2" color="text.secondary">Feedback:</Typography>
+                            <Typography variant="body2" sx={{ mt: 0.5 }}>{question.feedback}</Typography>
+                          </Grid>
+                        )}
+                        {question.attachments && question.attachments.length > 0 && (
+                          <Grid item xs={12}>
+                            <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>Attachments:</Typography>
+                            {question.attachments.map((att, attIdx) => (
+                              <Box key={attIdx} sx={{ mb: 1, p: 1, bgcolor: '#f9f9f9', borderRadius: 1, display: 'flex', justifyContent: 'space-between' }}>
+                                <Box>
+                                  <Typography variant="body2" fontWeight="bold">{att.title}</Typography>
+                                  <Typography variant="caption" color="text.secondary">
+                                    {att.type.toUpperCase()}
                                   </Typography>
-                                </AccordionSummary>
-                                <AccordionDetails>
-                                  <Grid container spacing={2}>
-                                    <Grid item xs={12}>
-                                      <Typography variant="subtitle2" color="text.secondary">Question Information:</Typography>
-                                      <Box sx={{ mt: 1, p: 1.5, bgcolor: '#f9f9f9', borderRadius: 1 }}>
-                                        {question.title && (
-                                          <Typography variant="body2"><strong>Title:</strong> {question.title}</Typography>
-                                        )}
-                                        {question.category && (
-                                          <Typography variant="body2" sx={{ mt: 0.5 }}>
-                                            <strong>Category:</strong> {question.category}
-                                          </Typography>
-                                        )}
-                                        {question.targetAudiences?.length > 0 && (
-                                          <Box sx={{ mt: 0.5, display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
-                                            <Typography variant="body2"><strong>Target Audiences:</strong></Typography>
-                                            {question.targetAudiences.map((aud, idx) => (
-                                              <Chip key={idx} label={aud} size="small" />
-                                            ))}
-                                          </Box>
-                                        )}
-                                        {question.visibility && (
-                                          <Typography variant="body2" sx={{ mt: 0.5 }}>
-                                            <strong>Visibility:</strong> {question.visibility}
-                                          </Typography>
-                                        )}
-                                        {question.tags?.length > 0 && (
-                                          <Box sx={{ mt: 0.5, display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
-                                            <Typography variant="body2"><strong>Tags:</strong></Typography>
-                                            {question.tags.map((tag, idx) => (
-                                              <Chip key={idx} label={tag} size="small" variant="outlined" />
-                                            ))}
-                                          </Box>
-                                        )}
-                                      </Box>
-                                    </Grid>
-                                    <Grid item xs={12}>
-                                      <Typography variant="subtitle2" color="text.secondary">Question:</Typography>
-                                      <Typography variant="body1" sx={{ mt: 0.5 }}>{questionDesc}</Typography>
-                                    </Grid>
-                                    <Grid item xs={12}>
-                                      <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>Answers:</Typography>
-                                      {question.answers?.map((answer, ansIdx) => (
-                                        <Box key={ansIdx} sx={{ mb: 1, p: 1, bgcolor: '#f9f9f9', borderRadius: 1 }}>
-                                          <Typography variant="body2">
-                                            <strong>Answer {ansIdx + 1}:</strong> {answer.text} 
-                                            <Chip label={`Score: ${answer.scoring}`} size="small" sx={{ ml: 1 }} />
-                                          </Typography>
-                                        </Box>
-                                      ))}
-                                    </Grid>
-                                    {question.feedback && (
-                                      <Grid item xs={12}>
-                                        <Typography variant="subtitle2" color="text.secondary">Feedback:</Typography>
-                                        <Typography variant="body2" sx={{ mt: 0.5 }}>{question.feedback}</Typography>
-                                      </Grid>
-                                    )}
-                                    {question.attachments?.length > 0 && (
-                                      <Grid item xs={12}>
-                                        <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>Attachments:</Typography>
-                                        {question.attachments.map((att, attIdx) => (
-                                          <Box key={attIdx} sx={{ mb: 1, p: 1, bgcolor: '#f9f9f9', borderRadius: 1, display: 'flex', justifyContent: 'space-between' }}>
-                                            <Box>
-                                              <Typography variant="body2" fontWeight="bold">{att.title}</Typography>
-                                              <Typography variant="caption" color="text.secondary">
-                                                {att.type.toUpperCase()}
-                                              </Typography>
-                                            </Box>
-                                            <Button size="small" href={att.url} target="_blank" rel="noopener noreferrer">
-                                              View
-                                            </Button>
-                                          </Box>
-                                        ))}
-                                      </Grid>
-                                    )}
-                                  </Grid>
-                                </AccordionDetails>
-                              </Accordion>
-                            );
-                          })}
-                        </AccordionDetails>
-                      </Accordion>
+                                </Box>
+                                <Button size="small" href={att.url} target="_blank" rel="noopener noreferrer">
+                                  View
+                                </Button>
+                              </Box>
+                            ))}
+                          </Grid>
+                        )}
+                      </Grid>
                     );
-                  })}
+                  })()}
                 </Grid>
               </Grid>
             </Box>
@@ -1257,6 +992,18 @@ export default function Cards() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Success Snackbar */}
+      <Snackbar
+        open={!!successMessage}
+        autoHideDuration={3000}
+        onClose={() => setSuccessMessage(null)}
+        anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+      >
+        <Alert onClose={() => setSuccessMessage(null)} severity="success" sx={{ width: '100%' }}>
+          {successMessage}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }

@@ -31,6 +31,8 @@ import {
   DialogContentText,
   Tabs,
   Tab,
+  Snackbar,
+  Divider,
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -72,6 +74,7 @@ export default function Packages() {
   const [cards, setCards] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [creatingPackage, setCreatingPackage] = useState(false);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [formData, setFormData] = useState({
@@ -87,10 +90,10 @@ export default function Packages() {
     },
     packageType: 'standard',
     category: 'standard',
-    includedCardIds: [],
     targetAudiences: [],
     maxSeats: 5,
-    expiryDate: '',
+    expiryTime: null,
+    expiryTimeUnit: null,
   });
   const [uploadingImage, setUploadingImage] = useState(false);
   const fileInputRef = useRef(null);
@@ -113,8 +116,13 @@ export default function Packages() {
     seatLimit: '',
     contractPricing: { amount: '', currency: 'EUR', billingType: 'one_time' },
     contract: { startDate: '', endDate: '', status: 'active' },
+    expiryTime: null,
+    expiryTimeUnit: null,
+    selectedProductIds: [],
     status: 'active'
   });
+  const [allProducts, setAllProducts] = useState([]);
+  const [loadingProducts, setLoadingProducts] = useState(false);
   const [requestsLoading, setRequestsLoading] = useState(false);
   const [requestStatusFilter, setRequestStatusFilter] = useState('all');
   const [viewRequestDialogOpen, setViewRequestDialogOpen] = useState(false);
@@ -138,6 +146,11 @@ export default function Packages() {
       startDate: '',
       endDate: ''
     }
+  });
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: '',
+    severity: 'success'
   });
 
 
@@ -189,8 +202,33 @@ export default function Packages() {
     }
   }, []);
 
+  const fetchProducts = useCallback(async () => {
+    try {
+      setLoadingProducts(true);
+      const api = getApiInstance();
+      const res = await api.get('/products', {
+        params: { includeInactive: true, all: true },
+      });
+      const productsData = Array.isArray(res.data) ? res.data : (res.data.products || []);
+      setAllProducts(productsData);
+    } catch (err) {
+      console.error('Error fetching products:', err);
+      setAllProducts([]);
+    } finally {
+      setLoadingProducts(false);
+    }
+  }, []);
+
   const handleEditCustomPackage = (pkg) => {
     setEditingCustomPackage(pkg);
+    // Convert productIds to string array for dropdown
+    const productIds = (pkg.productIds || []).map(p => {
+      if (typeof p === 'object' && p._id) {
+        return p._id.toString ? p._id.toString() : String(p._id);
+      }
+      return p.toString ? p.toString() : String(p);
+    });
+    
     setEditCustomPackageData({
       name: pkg.name || '',
       seatLimit: pkg.seatLimit || '',
@@ -208,8 +246,15 @@ export default function Packages() {
           : '',
         status: pkg.contract?.status || 'active'
       },
+      expiryTime: pkg.expiryTime || null,
+      expiryTimeUnit: pkg.expiryTimeUnit || null,
+      selectedProductIds: productIds,
       status: pkg.status || 'active'
     });
+    // Fetch products if not already loaded
+    if (allProducts.length === 0) {
+      fetchProducts();
+    }
     setEditCustomPackageDialog(true);
   };
 
@@ -223,6 +268,14 @@ export default function Packages() {
 
     try {
       const api = getApiInstance();
+      // Convert product IDs to strings
+      const productIds = (editCustomPackageData.selectedProductIds || []).map(p => {
+        if (typeof p === 'object' && p._id) {
+          return p._id.toString ? p._id.toString() : String(p._id);
+        }
+        return p.toString ? p.toString() : String(p);
+      });
+
       const updateData = {
         name: editCustomPackageData.name,
         seatLimit: parseInt(editCustomPackageData.seatLimit),
@@ -236,6 +289,9 @@ export default function Packages() {
           endDate: new Date(editCustomPackageData.contract.endDate),
           status: editCustomPackageData.contract.status
         },
+        expiryTime: editCustomPackageData.expiryTime || null,
+        expiryTimeUnit: editCustomPackageData.expiryTimeUnit || null,
+        productIds: productIds,
         status: editCustomPackageData.status
       };
 
@@ -294,10 +350,10 @@ export default function Packages() {
         packageType: pkg.packageType || pkg.type || pkg.category || 'standard',
         category: pkg.category || pkg.packageType || pkg.type || 'standard',
         pricing: pkg.pricing || { amount: '', currency: 'EUR', billingType: 'one_time' },
-        includedCardIds: pkg.includedCardIds?.map(c => c._id || c) || [],
     targetAudiences: pkg.targetAudiences || [],
     maxSeats: pkg.maxSeats || 5,
-    expiryDate: pkg.expiryDate ? new Date(pkg.expiryDate).toISOString().split('T')[0] : '',
+    expiryTime: pkg.expiryTime || null,
+    expiryTimeUnit: pkg.expiryTimeUnit || null,
   });
     } else {
       setEditing(null);
@@ -313,10 +369,10 @@ export default function Packages() {
           packageType: 'standard', // Default to standard for B2C, but user can select any option
           category: 'standard',
           pricing: { amount: '', currency: 'EUR', billingType: 'one_time' },
-          includedCardIds: [],
           targetAudiences: ['B2C'],
           maxSeats: 5,
-          expiryDate: '',
+          expiryTime: null,
+          expiryTimeUnit: null,
         });
       } else {
         // B2B/B2E tab - same as B2C, user can select any package type
@@ -329,10 +385,10 @@ export default function Packages() {
           packageType: 'standard', // Default to standard for B2B/B2E, but user can select any option
           category: 'standard',
           pricing: { amount: '', currency: 'EUR', billingType: 'one_time' },
-          includedCardIds: [],
           targetAudiences: ['B2B', 'B2E'],
           maxSeats: 5,
-          expiryDate: '',
+          expiryTime: null,
+          expiryTimeUnit: null,
         });
       }
     }
@@ -356,15 +412,27 @@ export default function Packages() {
         packageType: finalPackageType,
         category: finalPackageType,
         type: finalPackageType, // Also set type field for backward compatibility
-        targetAudiences: Array.isArray(formData.targetAudiences) ? formData.targetAudiences : [formData.targetAudiences || (mainTab === 0 ? 'B2C' : 'B2B')]
+        targetAudiences: Array.isArray(formData.targetAudiences) ? formData.targetAudiences : [formData.targetAudiences || (mainTab === 0 ? 'B2C' : 'B2B')],
+        expiryTime: formData.expiryTime ? parseInt(formData.expiryTime) : null,
+        expiryTimeUnit: formData.expiryTimeUnit || null
       };
       
       console.log('Submitting package data:', submitData); // Debug log
       
       if (editing) {
         await api.put(`/packages/${editing._id}`, submitData);
+        setSnackbar({
+          open: true,
+          message: 'Package edited successfully',
+          severity: 'success'
+        });
       } else {
         await api.post('/packages', submitData);
+        setSnackbar({
+          open: true,
+          message: 'Package created successfully',
+          severity: 'success'
+        });
       }
       fetchData();
       handleClose();
@@ -386,6 +454,11 @@ export default function Packages() {
     try {
       const api = getApiInstance();
       await api.delete(`/packages/${packageToDelete._id}`);
+      setSnackbar({
+        open: true,
+        message: 'Package deleted successfully',
+        severity: 'success'
+      });
       setDeleteDialogOpen(false);
       setPackageToDelete(null);
       fetchData();
@@ -589,6 +662,8 @@ export default function Packages() {
     if (!selectedRequest) return;
 
     try {
+      setCreatingPackage(true);
+      setError(null);
       // First check/create organization
       let organizationId = createPackageData.organizationId;
       
@@ -616,7 +691,7 @@ export default function Packages() {
         organizationId: organizationId,
         basePackageId: selectedRequest.basePackageId._id || selectedRequest.basePackageId,
         addedCardIds: selectedRequest.requestedModifications?.cardsToAdd || [],
-        removedCardIds: selectedRequest.requestedModifications?.cardsToRemove || [],
+        customPackageRequestId: selectedRequest._id, // Pass request ID so email can be sent to requester
         contractPricing: {
           amount: createPackageData.contractPricing.amount || selectedRequest.requestedModifications?.customPricing?.amount || 0,
           currency: createPackageData.contractPricing.currency || 'EUR',
@@ -630,24 +705,51 @@ export default function Packages() {
             : (selectedRequest.requestedModifications?.contractDuration?.startDate 
               ? new Date(selectedRequest.requestedModifications.contractDuration.startDate)
               : new Date()),
-          endDate: createPackageData.contract.endDate
-            ? new Date(createPackageData.contract.endDate)
-            : (selectedRequest.requestedModifications?.contractDuration?.endDate
-              ? new Date(selectedRequest.requestedModifications.contractDuration.endDate)
-              : new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)),
           status: 'active'
         },
+        expiryTime: createPackageData.expiryTime ? parseInt(createPackageData.expiryTime) : null,
+        expiryTimeUnit: createPackageData.expiryTimeUnit || null,
         status: 'active'
       };
 
+      console.log('📦 Creating custom package with data:', {
+        organizationId: organizationId,
+        customPackageRequestId: selectedRequest._id,
+        contactEmail: selectedRequest.contactEmail
+      });
+
       const customPackageRes = await api.post('/custom-packages', customPackageData);
 
-      // Update request status to completed
+      console.log('✅ Custom package created:', customPackageRes.data._id);
+      console.log('📧 Email status from API:', {
+        emailSent: customPackageRes.data.emailSent,
+        emailRecipient: customPackageRes.data.emailRecipient,
+        emailError: customPackageRes.data.emailError
+      });
+
+      // Show success message with email status
+      if (customPackageRes.data.emailSent) {
+        setSnackbar({
+          open: true,
+          message: `Custom package created successfully! Email sent to ${customPackageRes.data.emailRecipient}`,
+          severity: 'success'
+        });
+      } else {
+        setSnackbar({
+          open: true,
+          message: `Custom package created successfully! ${customPackageRes.data.emailError || 'Email could not be sent'}`,
+          severity: 'warning'
+        });
+      }
+
+      // Update request status to completed (this will also trigger email if not already sent)
       await api.put(`/custom-package-requests/${selectedRequest._id}/status`, {
         status: 'completed',
         adminNotes: `Custom package created successfully. Package ID: ${customPackageRes.data._id}`,
         customPackageId: customPackageRes.data._id
       });
+
+      console.log('✅ Request status updated to completed');
 
       setCreatePackageDialogOpen(false);
       setSelectedRequest(null);
@@ -655,13 +757,22 @@ export default function Packages() {
         organizationId: '',
         contractPricing: { amount: '', currency: 'EUR', billingType: 'one_time' },
         seatLimit: '',
-        contract: { startDate: '', endDate: '' }
+        contract: { startDate: '' },
+        expiryTime: null,
+        expiryTimeUnit: null
       });
       fetchRequests();
       setError(null);
     } catch (err) {
       console.error('Error creating custom package:', err);
-      setError(err.response?.data?.error || 'Failed to create custom package');
+      setError(err.response?.data?.error || err.message || 'Failed to create custom package');
+      setSnackbar({
+        open: true,
+        message: `Error: ${err.response?.data?.error || err.message || 'Failed to create custom package'}`,
+        severity: 'error'
+      });
+    } finally {
+      setCreatingPackage(false);
     }
   };
 
@@ -696,6 +807,7 @@ export default function Packages() {
               sx={{ 
                 minWidth: 150,
                 overflow: 'visible',
+                mt: 1,
                 '& .MuiInputBase-root': {
                   overflow: 'visible',
                 }
@@ -710,16 +822,19 @@ export default function Packages() {
                   transform: 'translate(14px, 16px) scale(1)',
                   transformOrigin: 'top left',
                   pointerEvents: 'none',
-                  overflow: 'visible !important',
+                  overflow: 'visible',
                   textOverflow: 'clip',
                   whiteSpace: 'nowrap',
-                  mt:.3,
                   maxWidth: 'none',
                   width: 'auto',
+                  zIndex: 1,
+                  backgroundColor: 'white',
+                  px: 0.5,
                   '&.MuiInputLabel-shrink': {
                     transform: 'translate(14px, -9px) scale(0.75)',
                     transformOrigin: 'top left',
                     maxWidth: 'calc(133% - 18.67px)',
+                    backgroundColor: 'white',
                   },
                   '&.Mui-focused': {
                     color: 'primary.main',
@@ -734,11 +849,16 @@ export default function Packages() {
                 label="Filter by Status"
                 onChange={(e) => setStatusFilter(e.target.value)}
                 sx={{
-                  overflow: 'visible',
                   '& .MuiOutlinedInput-notchedOutline': {
                     borderWidth: '1px',
                   },
                   '& .MuiSelect-select': {
+                    whiteSpace: 'nowrap',
+                    overflow: 'visible',
+                    textOverflow: 'clip',
+                    minWidth: 'fit-content',
+                  },
+                  '& .MuiInputBase-root': {
                     overflow: 'visible',
                   }
                 }}
@@ -748,13 +868,7 @@ export default function Packages() {
                 <MenuItem value="archived">Archived</MenuItem>
               </Select>
             </FormControl>
-            <Button
-              variant="contained"
-              startIcon={<AddIcon />}
-              onClick={() => handleOpen()}
-            >
-              Create Package
-            </Button>
+            {/* Create Package button hidden - packages are predefined */}
             </Box>
           )}
         </Box>
@@ -806,7 +920,7 @@ export default function Packages() {
                     <TableCell>Visibility</TableCell>
                     <TableCell>Pricing</TableCell>
                     <TableCell>Max Seats</TableCell>
-                    <TableCell>Cards Count</TableCell>
+                    <TableCell>Expiry Time</TableCell>
                     <TableCell>Actions</TableCell>
                   </TableRow>
                 </TableHead>
@@ -854,28 +968,35 @@ export default function Packages() {
                             {pkg.maxSeats || 5}
                           </Typography>
                         </TableCell>
-                        <TableCell>{pkg.includedCardIds?.length || 0}</TableCell>
+                        <TableCell>
+                          <Typography variant="body2">
+                            {pkg.expiryTime && pkg.expiryTimeUnit 
+                              ? `${pkg.expiryTime} ${pkg.expiryTimeUnit === 'months' ? 'Month' : 'Year'}${pkg.expiryTime !== 1 ? 's' : ''}`
+                              : 'No expiry'}
+                          </Typography>
+                        </TableCell>
                         <TableCell>
                           <Box display="flex" gap={0.5}>
                             <IconButton size="small" onClick={() => handleOpen(pkg)} title="Edit">
                               <EditIcon />
                             </IconButton>
-                            <IconButton 
-                              size="small" 
-                              onClick={() => handleArchiveClick(pkg)}
-                              title={pkg.status === 'archived' ? 'Unarchive' : 'Archive'}
-                              color={pkg.status === 'archived' ? 'primary' : 'default'}
-                            >
-                              {pkg.status === 'archived' ? <UnarchiveIcon /> : <ArchiveIcon />}
-                            </IconButton>
-                            <IconButton 
-                              size="small" 
-                              onClick={() => handleDeleteClick(pkg)}
-                              title="Permanently Delete"
-                              color="error"
-                            >
-                              <DeleteIcon />
-                            </IconButton>
+                                <IconButton 
+                                  size="small" 
+                                  onClick={() => handleArchiveClick(pkg)}
+                                  title={pkg.status === 'archived' ? 'Unarchive' : 'Archive'}
+                                  color={pkg.status === 'archived' ? 'primary' : 'default'}
+                                >
+                                  {pkg.status === 'archived' ? <UnarchiveIcon /> : <ArchiveIcon />}
+                                </IconButton>
+                                {/* Delete button commented out - only edit allowed */}
+                                {/* <IconButton 
+                                  size="small" 
+                                  onClick={() => handleDeleteClick(pkg)}
+                                  title="Permanently Delete"
+                                  color="error"
+                                >
+                                  <DeleteIcon />
+                                </IconButton> */}
                           </Box>
                         </TableCell>
                       </TableRow>
@@ -932,7 +1053,7 @@ export default function Packages() {
                         <TableCell>Visibility</TableCell>
                         <TableCell>Pricing</TableCell>
                         <TableCell>Max Seats</TableCell>
-                        <TableCell>Cards Count</TableCell>
+                        <TableCell>Expiry Time</TableCell>
                         <TableCell>Actions</TableCell>
                       </TableRow>
                     </TableHead>
@@ -980,36 +1101,43 @@ export default function Packages() {
                                 {pkg.maxSeats || 5}
                               </Typography>
                             </TableCell>
-                            <TableCell>{pkg.includedCardIds?.length || 0}</TableCell>
+                            <TableCell>
+                              <Typography variant="body2">
+                                {pkg.expiryTime && pkg.expiryTimeUnit 
+                                  ? `${pkg.expiryTime} ${pkg.expiryTimeUnit === 'months' ? 'Month' : 'Year'}${pkg.expiryTime !== 1 ? 's' : ''}`
+                                  : 'No expiry'}
+                              </Typography>
+                            </TableCell>
                             <TableCell>
                               <Box display="flex" gap={0.5}>
                                 <IconButton size="small" onClick={() => handleOpen(pkg)} title="Edit">
                                   <EditIcon />
                                 </IconButton>
-                                <IconButton 
-                                  size="small" 
-                                  onClick={() => handleArchiveClick(pkg)}
-                                  title={pkg.status === 'archived' ? 'Unarchive' : 'Archive'}
-                                  color={pkg.status === 'archived' ? 'primary' : 'default'}
-                                >
-                                  {pkg.status === 'archived' ? <UnarchiveIcon /> : <ArchiveIcon />}
-                                </IconButton>
-                                <IconButton 
-                                  size="small" 
-                                  onClick={() => handleDeleteClick(pkg)}
-                                  title="Permanently Delete"
-                                  color="error"
-                                >
-                                  <DeleteIcon />
-                                </IconButton>
-                              </Box>
-                            </TableCell>
-                          </TableRow>
-                        ))
-                      )}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
+                            <IconButton 
+                              size="small" 
+                              onClick={() => handleArchiveClick(pkg)}
+                              title={pkg.status === 'archived' ? 'Unarchive' : 'Archive'}
+                              color={pkg.status === 'archived' ? 'primary' : 'default'}
+                            >
+                              {pkg.status === 'archived' ? <UnarchiveIcon /> : <ArchiveIcon />}
+                            </IconButton>
+                            {/* Delete button commented out - only edit allowed */}
+                            {/* <IconButton 
+                              size="small" 
+                              onClick={() => handleDeleteClick(pkg)}
+                              title="Permanently Delete"
+                              color="error"
+                            >
+                              <DeleteIcon />
+                            </IconButton> */}
+                          </Box>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
               )}
             </>
           )}
@@ -1040,8 +1168,7 @@ export default function Packages() {
                     <TableHead>
                       <TableRow>
                         <TableCell>Name</TableCell>
-                        <TableCell>Organization</TableCell>
-                        <TableCell>Base Package</TableCell>
+                        <TableCell>Organization/Institute</TableCell>
                         <TableCell>Status</TableCell>
                         <TableCell>Seat Limit</TableCell>
                         <TableCell>Contract Period</TableCell>
@@ -1052,20 +1179,32 @@ export default function Packages() {
                     <TableBody>
                       {customPackages.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={8} align="center">
+                          <TableCell colSpan={6} align="center">
                             <Typography color="text.secondary">No custom packages found</Typography>
                           </TableCell>
                         </TableRow>
                       ) : (
                         customPackages.map((pkg) => (
                           <TableRow key={pkg._id}>
-                            <TableCell>{pkg.name || pkg.basePackageId?.name || 'Unknown'}</TableCell>
-                            <TableCell>{pkg.organizationId?.name || 'N/A'}</TableCell>
-                            <TableCell>{pkg.basePackageId?.name || 'N/A'}</TableCell>
+                            <TableCell>{pkg.name || 'Unknown'}</TableCell>
+                            <TableCell>
+                              {pkg.organizationId?.name || pkg.schoolId?.name || 'N/A'}
+                              {pkg.entityType && (
+                                <Typography variant="caption" color="text.secondary" display="block">
+                                  ({pkg.entityType === 'organization' ? 'Organization' : 'Institute'})
+                                </Typography>
+                              )}
+                            </TableCell>
                             <TableCell>
                               <Chip
-                                label={pkg.contract?.status || pkg.status || 'N/A'}
-                                color={pkg.contract?.status === 'active' || pkg.status === 'active' ? 'success' : 'default'}
+                                label={pkg.contract?.status || pkg.status || 'pending'}
+                                color={
+                                  pkg.contract?.status === 'active' || pkg.status === 'active' 
+                                    ? 'success' 
+                                    : pkg.contract?.status === 'expired' || pkg.status === 'archived'
+                                    ? 'error'
+                                    : 'default'
+                                }
                                 size="small"
                               />
                             </TableCell>
@@ -1100,14 +1239,15 @@ export default function Packages() {
                               >
                                 <EditIcon />
                               </IconButton>
-                              <IconButton 
+                              {/* Delete button commented out - only edit allowed */}
+                              {/* <IconButton 
                                 size="small" 
                                 onClick={() => handleDeleteCustomPackage(pkg)}
                                 color="error"
                                 title="Delete"
                               >
                                 <DeleteIcon />
-                              </IconButton>
+                              </IconButton> */}
                             </TableCell>
                           </TableRow>
                         ))
@@ -1138,14 +1278,13 @@ export default function Packages() {
                   <TableCell>Status</TableCell>
                   <TableCell>Visibility</TableCell>
                   <TableCell>Pricing</TableCell>
-                  <TableCell>Cards Count</TableCell>
                   <TableCell>Actions</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {packages.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} align="center">
+                    <TableCell colSpan={7} align="center">
                       <Typography color="text.secondary">No packages found</Typography>
                     </TableCell>
                   </TableRow>
@@ -1173,7 +1312,6 @@ export default function Packages() {
                           </Typography>
                         </Box>
                       </TableCell>
-                      <TableCell>{pkg.includedCardIds?.length || 0}</TableCell>
                       <TableCell>
                         <Box display="flex" gap={0.5}>
                           <IconButton size="small" onClick={() => handleOpen(pkg)} title="Edit">
@@ -1187,14 +1325,15 @@ export default function Packages() {
                           >
                             {pkg.status === 'archived' ? <UnarchiveIcon /> : <ArchiveIcon />}
                           </IconButton>
-                          <IconButton 
+                          {/* Delete button commented out - only edit allowed */}
+                          {/* <IconButton 
                             size="small" 
                             onClick={() => handleDeleteClick(pkg)}
                             title="Permanently Delete"
                             color="error"
                           >
                             <DeleteIcon />
-                          </IconButton>
+                          </IconButton> */}
                         </Box>
                       </TableCell>
                     </TableRow>
@@ -1463,41 +1602,30 @@ export default function Packages() {
             <Grid item xs={12} sm={6}>
               <TextField
                 fullWidth
-                label="Expiry Date"
-                type="date"
-                value={formData.expiryDate || ''}
-                onChange={(e) => setFormData({ ...formData, expiryDate: e.target.value })}
-                InputLabelProps={{
-                  shrink: true,
-                }}
-                helperText="Date when this package expires"
+                select
+                label="Expiry Time Unit"
+                value={formData.expiryTimeUnit || ''}
+                onChange={(e) => setFormData({ ...formData, expiryTimeUnit: e.target.value })}
+                helperText="Select months or years"
+              >
+                <MenuItem value="">None</MenuItem>
+                <MenuItem value="months">Months</MenuItem>
+                <MenuItem value="years">Years</MenuItem>
+              </TextField>
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label={formData.expiryTimeUnit === 'months' ? 'Number of Months' : formData.expiryTimeUnit === 'years' ? 'Number of Years' : 'Expiry Time'}
+                type="number"
+                value={formData.expiryTime || ''}
+                onChange={(e) => setFormData({ ...formData, expiryTime: e.target.value ? parseInt(e.target.value) : null })}
+                inputProps={{ min: 1 }}
+                disabled={!formData.expiryTimeUnit}
+                helperText={formData.expiryTimeUnit ? `Enter number of ${formData.expiryTimeUnit}` : 'Select expiry time unit first'}
               />
             </Grid>
-            <Grid item xs={12}>
-              <FormControl fullWidth>
-                <InputLabel>Included Cards</InputLabel>
-                <Select
-                  multiple
-                  value={formData.includedCardIds}
-                  onChange={(e) => setFormData({ ...formData, includedCardIds: e.target.value })}
-                  input={<OutlinedInput label="Included Cards" />}
-                  renderValue={(selected) => (
-                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                      {selected.map((value) => {
-                        const card = cards.find(c => (c._id || c) === value);
-                        return <Chip key={value} label={card?.title || value} size="small" />;
-                      })}
-                    </Box>
-                  )}
-                >
-                  {cards.map((card) => (
-                    <MenuItem key={card._id} value={card._id}>
-                      {card.title} ({card.category})
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Grid>
+            {/* Included Cards field removed - packages are predefined */}
           </Grid>
         </DialogContent>
         <DialogActions>
@@ -1759,20 +1887,38 @@ export default function Packages() {
       {/* Create Custom Package Dialog */}
       <Dialog
         open={createPackageDialogOpen}
-        onClose={() => {
+        onClose={creatingPackage ? undefined : () => {
           setCreatePackageDialogOpen(false);
           setCreatePackageData({
             organizationId: '',
             contractPricing: { amount: '', currency: 'EUR', billingType: 'one_time' },
             seatLimit: '',
-            contract: { startDate: '', endDate: '' }
+            contract: { startDate: '' },
+            expiryTime: null,
+            expiryTimeUnit: null
           });
         }}
         maxWidth="md"
         fullWidth
+        disableEscapeKeyDown={creatingPackage}
       >
-        <DialogTitle>Create Custom Package</DialogTitle>
+        <DialogTitle>
+          Create Custom Package
+          {creatingPackage && (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 1 }}>
+              <CircularProgress size={16} />
+              <Typography variant="body2" color="text.secondary">
+                Creating package and sending email...
+              </Typography>
+            </Box>
+          )}
+        </DialogTitle>
         <DialogContent>
+          {error && (
+            <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
+              {error}
+            </Alert>
+          )}
           <Box sx={{ mt: 2 }}>
             <Grid container spacing={2}>
               <Grid item xs={12}>
@@ -1782,6 +1928,7 @@ export default function Packages() {
                     value={createPackageData.organizationId}
                     label="Organization"
                     onChange={(e) => setCreatePackageData({ ...createPackageData, organizationId: e.target.value })}
+                    disabled={creatingPackage}
                   >
                     <MenuItem value="">
                       <em>Create New Organization</em>
@@ -1810,6 +1957,7 @@ export default function Packages() {
                     contractPricing: { ...createPackageData.contractPricing, amount: e.target.value }
                   })}
                   required
+                  disabled={creatingPackage}
                 />
               </Grid>
               <Grid item xs={12} sm={6}>
@@ -1822,6 +1970,7 @@ export default function Packages() {
                       ...createPackageData,
                       contractPricing: { ...createPackageData.contractPricing, billingType: e.target.value }
                     })}
+                    disabled={creatingPackage}
                   >
                     <MenuItem value="one_time">One Time</MenuItem>
                     <MenuItem value="subscription">Subscription</MenuItem>
@@ -1837,6 +1986,7 @@ export default function Packages() {
                   value={createPackageData.seatLimit}
                   onChange={(e) => setCreatePackageData({ ...createPackageData, seatLimit: e.target.value })}
                   required
+                  disabled={creatingPackage}
                 />
               </Grid>
               <Grid item xs={12} sm={6}>
@@ -1851,39 +2001,69 @@ export default function Packages() {
                   })}
                   InputLabelProps={{ shrink: true }}
                   required
+                  disabled={creatingPackage}
                 />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <FormControl fullWidth>
+                  <InputLabel>Expiry Time Unit</InputLabel>
+                  <Select
+                    value={createPackageData.expiryTimeUnit || ''}
+                    label="Expiry Time Unit"
+                    onChange={(e) => setCreatePackageData({ 
+                      ...createPackageData, 
+                      expiryTimeUnit: e.target.value 
+                    })}
+                    disabled={creatingPackage}
+                  >
+                    <MenuItem value="">None</MenuItem>
+                    <MenuItem value="months">Months</MenuItem>
+                    <MenuItem value="years">Years</MenuItem>
+                  </Select>
+                </FormControl>
               </Grid>
               <Grid item xs={12} sm={6}>
                 <TextField
                   fullWidth
-                  label="Contract End Date"
-                  type="date"
-                  value={createPackageData.contract.endDate}
-                  onChange={(e) => setCreatePackageData({
-                    ...createPackageData,
-                    contract: { ...createPackageData.contract, endDate: e.target.value }
+                  label="Expiry Time"
+                  type="number"
+                  value={createPackageData.expiryTime || ''}
+                  onChange={(e) => setCreatePackageData({ 
+                    ...createPackageData, 
+                    expiryTime: e.target.value ? parseInt(e.target.value) : null 
                   })}
-                  InputLabelProps={{ shrink: true }}
-                  required
+                  disabled={creatingPackage || !createPackageData.expiryTimeUnit}
+                  helperText={createPackageData.expiryTimeUnit ? `Enter number of ${createPackageData.expiryTimeUnit}` : 'Select expiry time unit first'}
                 />
               </Grid>
             </Grid>
           </Box>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => {
-            setCreatePackageDialogOpen(false);
-            setCreatePackageData({
-              organizationId: '',
-              contractPricing: { amount: '', currency: 'EUR', billingType: 'one_time' },
-              seatLimit: '',
-              contract: { startDate: '', endDate: '' }
-            });
-          }}>
+          <Button 
+            onClick={() => {
+              if (!creatingPackage) {
+                setCreatePackageDialogOpen(false);
+                setCreatePackageData({
+                  organizationId: '',
+                  contractPricing: { amount: '', currency: 'EUR', billingType: 'one_time' },
+                  seatLimit: '',
+                  contract: { startDate: '', endDate: '' }
+                });
+              }
+            }}
+            disabled={creatingPackage}
+          >
             Cancel
           </Button>
-          <Button onClick={handleCreateCustomPackage} variant="contained" color="success">
-            Create Package
+          <Button 
+            onClick={handleCreateCustomPackage} 
+            variant="contained" 
+            color="success"
+            disabled={creatingPackage}
+            startIcon={creatingPackage ? <CircularProgress size={20} color="inherit" /> : null}
+          >
+            {creatingPackage ? 'Creating Package & Sending Email...' : 'Create Package'}
           </Button>
         </DialogActions>
       </Dialog>
@@ -1899,6 +2079,9 @@ export default function Packages() {
             seatLimit: '',
             contractPricing: { amount: '', currency: 'EUR', billingType: 'one_time' },
             contract: { startDate: '', endDate: '', status: 'active' },
+            expiryTime: null,
+            expiryTimeUnit: null,
+            selectedProductIds: [],
             status: 'active'
           });
         }}
@@ -1911,11 +2094,8 @@ export default function Packages() {
             <Box sx={{ mt: 2 }}>
               <Grid container spacing={2}>
                 <Grid item xs={12}>
-                  <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-                    Organization: {editingCustomPackage.organizationId?.name || 'N/A'}
-                  </Typography>
-                  <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-                    Base Package: {editingCustomPackage.basePackageId?.name || 'N/A'}
+                  <Typography variant="subtitle1" sx={{ fontWeight: 600, color: '#063C5E', mb: 1 }}>
+                    {editingCustomPackage.entityType === 'organization' ? 'Organization' : editingCustomPackage.entityType === 'institute' ? 'Institute' : 'Organization/Institute'}: {editingCustomPackage.organizationId?.name || editingCustomPackage.schoolId?.name || 'N/A'}
                   </Typography>
                 </Grid>
                 <Grid item xs={12}>
@@ -2013,6 +2193,37 @@ export default function Packages() {
                 </Grid>
                 <Grid item xs={12} sm={6}>
                   <FormControl fullWidth>
+                    <InputLabel>Expiry Time Unit</InputLabel>
+                    <Select
+                      value={editCustomPackageData.expiryTimeUnit || ''}
+                      label="Expiry Time Unit"
+                      onChange={(e) => setEditCustomPackageData({ 
+                        ...editCustomPackageData, 
+                        expiryTimeUnit: e.target.value 
+                      })}
+                    >
+                      <MenuItem value="">None</MenuItem>
+                      <MenuItem value="months">Months</MenuItem>
+                      <MenuItem value="years">Years</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <TextField
+                    fullWidth
+                    label="Expiry Time"
+                    type="number"
+                    value={editCustomPackageData.expiryTime || ''}
+                    onChange={(e) => setEditCustomPackageData({ 
+                      ...editCustomPackageData, 
+                      expiryTime: e.target.value ? parseInt(e.target.value) : null 
+                    })}
+                    disabled={!editCustomPackageData.expiryTimeUnit}
+                    helperText={editCustomPackageData.expiryTimeUnit ? `Enter number of ${editCustomPackageData.expiryTimeUnit}` : 'Select expiry time unit first'}
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <FormControl fullWidth>
                     <InputLabel>Package Status</InputLabel>
                     <Select
                       value={editCustomPackageData.status}
@@ -2024,6 +2235,124 @@ export default function Packages() {
                       <MenuItem value="pending">Pending</MenuItem>
                     </Select>
                   </FormControl>
+                </Grid>
+                
+                {/* Products Section - Editable */}
+                <Grid item xs={12}>
+                  <Divider sx={{ my: 2 }} />
+                  <Typography variant="h6" gutterBottom>
+                    Select Products
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                    Select private products to attach to this custom package
+                  </Typography>
+                  
+                  {loadingProducts ? (
+                    <Box display="flex" justifyContent="center" p={2}>
+                      <CircularProgress size={24} />
+                    </Box>
+                  ) : (
+                    <FormControl fullWidth>
+                      <InputLabel id="edit-products-label">Select Products</InputLabel>
+                      <Select
+                        labelId="edit-products-label"
+                        multiple
+                        value={(editCustomPackageData.selectedProductIds || []).map(id => id?.toString ? id.toString() : String(id))}
+                        onChange={(e) => {
+                          const selectedIds = e.target.value;
+                          // Convert back to product objects/IDs
+                          const products = allProducts.filter(p => {
+                            const pId = p._id?.toString ? p._id.toString() : String(p._id);
+                            return selectedIds.includes(pId) && p.visibility === 'private';
+                          });
+                          setEditCustomPackageData({
+                            ...editCustomPackageData,
+                            selectedProductIds: products.map(p => p._id)
+                          });
+                        }}
+                        input={<OutlinedInput label="Select Products" />}
+                        renderValue={(selected) => (
+                          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                            {selected.length === 0 ? (
+                              <Typography variant="body2" color="text.secondary">
+                                None selected
+                              </Typography>
+                            ) : (
+                              selected.map((productIdStr) => {
+                                const product = allProducts.find((p) => {
+                                  const pId = p._id?.toString ? p._id.toString() : String(p._id);
+                                  return pId === productIdStr && p.visibility === 'private';
+                                });
+                                if (!product) return null;
+                                return (
+                                  <Chip
+                                    key={productIdStr}
+                                    label={`${product.name} (€${product.price})`}
+                                    size="small"
+                                    sx={{
+                                      backgroundColor: 'rgba(11, 120, 151, 0.1)',
+                                      color: '#0B7897',
+                                      fontWeight: 500
+                                    }}
+                                  />
+                                );
+                              })
+                            )}
+                          </Box>
+                        )}
+                        MenuProps={{
+                          PaperProps: {
+                            style: {
+                              maxHeight: 300,
+                              width: 'auto',
+                            },
+                          },
+                        }}
+                      >
+                        {loadingProducts ? (
+                          <MenuItem disabled>
+                            <CircularProgress size={20} sx={{ mr: 1 }} />
+                            Loading...
+                          </MenuItem>
+                        ) : allProducts.filter(p => p.visibility === 'private').length === 0 ? (
+                          <MenuItem disabled>No private products available</MenuItem>
+                        ) : (
+                          allProducts.filter(p => p.visibility === 'private').map((product) => {
+                            const productId = product._id?.toString ? product._id.toString() : String(product._id);
+                            return (
+                              <MenuItem key={product._id} value={productId}>
+                                <Box display="flex" alignItems="center" gap={1} flexWrap="wrap" sx={{ width: '100%' }}>
+                                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                    {product.name || 'Untitled Product'}
+                                  </Typography>
+                                  <Chip
+                                    label={product.visibility === 'private' ? 'Private' : 'Public'}
+                                    size="small"
+                                    sx={{
+                                      backgroundColor: product.visibility === 'private'
+                                        ? 'rgba(255, 152, 0, 0.1)'
+                                        : 'rgba(76, 175, 80, 0.1)',
+                                      color: product.visibility === 'private'
+                                        ? '#FF9800'
+                                        : '#4CAF50',
+                                      fontSize: '0.7rem',
+                                      height: '20px',
+                                    }}
+                                  />
+                                  <Typography variant="caption" color="text.secondary">
+                                    €{product.price}
+                                  </Typography>
+                                </Box>
+                              </MenuItem>
+                            );
+                          })
+                        )}
+                      </Select>
+                      <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                        Selected: {editCustomPackageData.selectedProductIds?.length || 0} product(s)
+                      </Typography>
+                    </FormControl>
+                  )}
                 </Grid>
               </Grid>
             </Box>
@@ -2078,6 +2407,22 @@ export default function Packages() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Success Snackbar */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={4000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert 
+          onClose={() => setSnackbar({ ...snackbar, open: false })} 
+          severity={snackbar.severity}
+          sx={{ width: '100%' }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }

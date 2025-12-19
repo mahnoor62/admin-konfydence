@@ -215,10 +215,8 @@ export default function Sales() {
   };
 
   const formatCurrency = (amount, currency = 'EUR') => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: currency,
-    }).format(amount || 0);
+    const currencySymbol = currency === 'EUR' ? '€' : currency;
+    return `${currencySymbol} ${(amount || 0).toFixed(2)}`;
   };
 
   if (loading) {

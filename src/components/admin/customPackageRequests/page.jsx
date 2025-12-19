@@ -33,6 +33,7 @@ import {
   Divider,
   Chip as MuiChip,
   Snackbar,
+  OutlinedInput,
 } from '@mui/material';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
@@ -70,6 +71,7 @@ function getApiInstance() {
 export default function CustomPackageRequests() {
   const [requests, setRequests] = useState([]);
   const [organizations, setOrganizations] = useState([]);
+  const [schools, setSchools] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [statusFilter, setStatusFilter] = useState('all');
@@ -83,15 +85,21 @@ export default function CustomPackageRequests() {
   });
   const [createPackageData, setCreatePackageData] = useState({
     organizationId: '',
+    schoolId: '',
+    entityType: '', // 'organization' or 'institute'
     contractPricing: { amount: '', currency: 'EUR', billingType: 'one_time' },
     seatLimit: '',
-    contract: { startDate: '', endDate: '' },
+    contract: { startDate: '' },
+    expiryTime: null,
+    expiryTimeUnit: null,
     addedCardIds: [],
-    removedCardIds: []
+    selectedProductIds: []
   });
   const [creating, setCreating] = useState(false);
   const [allCards, setAllCards] = useState([]);
   const [loadingCards, setLoadingCards] = useState(false);
+  const [allProducts, setAllProducts] = useState([]);
+  const [loadingProducts, setLoadingProducts] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState(false);
@@ -104,6 +112,16 @@ export default function CustomPackageRequests() {
       setOrganizations(res.data || []);
     } catch (err) {
       console.error('Error fetching organizations:', err);
+    }
+  }, []);
+
+  const fetchSchools = useCallback(async () => {
+    try {
+      const api = getApiInstance();
+      const res = await api.get('/schools');
+      setSchools(res.data || []);
+    } catch (err) {
+      console.error('Error fetching schools:', err);
     }
   }, []);
 
@@ -150,7 +168,8 @@ export default function CustomPackageRequests() {
   useEffect(() => {
     fetchRequests();
     fetchOrganizations();
-  }, [fetchRequests, fetchOrganizations]);
+    fetchSchools();
+  }, [fetchRequests, fetchOrganizations, fetchSchools]);
 
   const fetchCards = async () => {
     try {
@@ -162,6 +181,23 @@ export default function CustomPackageRequests() {
       console.error('Error fetching cards:', err);
     } finally {
       setLoadingCards(false);
+    }
+  };
+
+  const fetchProducts = async () => {
+    try {
+      setLoadingProducts(true);
+      const api = getApiInstance();
+      const res = await api.get('/products', {
+        params: { includeInactive: true, all: true },
+      });
+      const productsData = Array.isArray(res.data) ? res.data : (res.data.products || []);
+      setAllProducts(productsData);
+    } catch (err) {
+      console.error('Error fetching products:', err);
+      setAllProducts([]);
+    } finally {
+      setLoadingProducts(false);
     }
   };
 
@@ -182,22 +218,43 @@ export default function CustomPackageRequests() {
   const handleCreatePackage = async (request) => {
     setSelectedRequest(request);
     
-    // Fetch cards when opening dialog
-    await fetchCards();
+    // Fetch products when opening dialog (including private products)
+    await fetchProducts();
     
-    // Get base package cards
-    const basePackageCardIds = request.basePackageId?.cardIds || [];
+    // Get cards from request (if any)
     const requestedCardsToAdd = request.requestedModifications?.cardsToAdd || [];
-    const requestedCardsToRemove = request.requestedModifications?.cardsToRemove || [];
     
-    // Start with base package cards, add requested cards, remove requested removals
-    const initialCardIds = [
-      ...basePackageCardIds.filter(id => !requestedCardsToRemove.some(removeId => removeId.toString() === id.toString())),
-      ...requestedCardsToAdd
-    ];
+    // Use requested cards as initial selection
+    const initialCardIds = requestedCardsToAdd;
+    
+    // Auto-detect entity type from request
+    let entityType = '';
+    let organizationId = '';
+    let schoolId = '';
+    
+    if (request.entityType) {
+      // If entityType is explicitly set in request
+      entityType = request.entityType;
+      if (entityType === 'organization') {
+        organizationId = request.organizationId?._id || request.organizationId || '';
+      } else if (entityType === 'institute') {
+        schoolId = request.schoolId?._id || request.schoolId || '';
+      }
+    } else {
+      // Auto-detect from organizationId/schoolId
+      if (request.organizationId?._id || request.organizationId) {
+        entityType = 'organization';
+        organizationId = request.organizationId?._id || request.organizationId;
+      } else if (request.schoolId?._id || request.schoolId) {
+        entityType = 'institute';
+        schoolId = request.schoolId?._id || request.schoolId;
+      }
+    }
     
     setCreatePackageData({
-      organizationId: '',
+      organizationId: organizationId,
+      schoolId: schoolId,
+      entityType: entityType,
       contractPricing: { 
         amount: request.requestedModifications?.customPricing?.amount || '', 
         currency: request.requestedModifications?.customPricing?.currency || 'EUR', 
@@ -212,8 +269,7 @@ export default function CustomPackageRequests() {
           ? new Date(request.requestedModifications.contractDuration.endDate).toISOString().split('T')[0]
           : '' 
       },
-      addedCardIds: initialCardIds,
-      removedCardIds: []
+      addedCardIds: initialCardIds
     });
     setCreatePackageDialog(true);
   };
@@ -270,77 +326,216 @@ export default function CustomPackageRequests() {
       setCreating(true);
       const api = getApiInstance();
       
-      // First check/create organization
-      let organizationId = createPackageData.organizationId;
+      // Get organizationId/schoolId based on entityType
+      let organizationId = null;
+      let schoolId = null;
       
-      if (!organizationId) {
-        // Create organization from request
-        const orgRes = await api.post('/organizations', {
-          name: selectedRequest.organizationName,
-          type: 'other',
-          segment: 'B2B',
-          primaryContact: {
-            name: selectedRequest.contactName,
-            email: selectedRequest.contactEmail,
-            phone: selectedRequest.contactPhone || '',
-            jobTitle: ''
-          },
-          status: 'prospect'
-        });
-        organizationId = orgRes.data._id;
+      if (createPackageData.entityType === 'organization') {
+        organizationId = createPackageData.organizationId || selectedRequest.organizationId?._id || selectedRequest.organizationId;
+      } else if (createPackageData.entityType === 'institute') {
+        schoolId = createPackageData.schoolId || selectedRequest.schoolId?._id || selectedRequest.schoolId;
+      }
+      
+      // If not selected, try to find existing, then create if needed
+      if (!organizationId && !schoolId) {
+        // Try to find existing organization by name (for organization type)
+        if (createPackageData.entityType === 'organization') {
+          try {
+            const orgsRes = await api.get('/organizations', {
+              params: { search: selectedRequest.organizationName }
+            });
+            if (orgsRes.data && orgsRes.data.length > 0) {
+              organizationId = orgsRes.data[0]._id;
+            }
+          } catch (e) {
+            console.log('Could not find organization by name');
+          }
+        }
+        
+        // Try to find existing school by name (for institute type)
+        if (createPackageData.entityType === 'institute') {
+          try {
+            const schoolsRes = await api.get('/schools', {
+              params: { search: selectedRequest.organizationName }
+            });
+            if (schoolsRes.data && schoolsRes.data.length > 0) {
+              schoolId = schoolsRes.data[0]._id;
+            }
+          } catch (e) {
+            console.log('Could not find school by name');
+          }
+        }
+        
+        // If still not found, create organization/school based on entityType
+        if (!organizationId && !schoolId) {
+          try {
+            if (createPackageData.entityType === 'institute') {
+              // Create school for Institute
+              const schoolRes = await api.post('/schools', {
+                name: selectedRequest.organizationName,
+                type: 'school',
+                primaryContact: {
+                  name: selectedRequest.contactName,
+                  email: selectedRequest.contactEmail,
+                  phone: selectedRequest.contactPhone || '',
+                  jobTitle: ''
+                },
+                status: 'prospect'
+              });
+              schoolId = schoolRes.data._id;
+            } else {
+              // Default to organization for B2B
+              const orgRes = await api.post('/organizations', {
+                name: selectedRequest.organizationName,
+                type: 'other',
+                segment: 'B2B',
+                primaryContact: {
+                  name: selectedRequest.contactName,
+                  email: selectedRequest.contactEmail,
+                  phone: selectedRequest.contactPhone || '',
+                  jobTitle: ''
+                },
+                status: 'prospect'
+              });
+              organizationId = orgRes.data._id;
+            }
+          } catch (createErr) {
+            console.error('Error creating organization/school:', createErr);
+            throw createErr; // Re-throw to be caught by outer catch
+          }
+        }
       }
 
-      // Create custom package
-      const customPackageData = {
-        organizationId: organizationId,
-        basePackageId: selectedRequest.basePackageId._id || selectedRequest.basePackageId,
-        addedCardIds: createPackageData.addedCardIds || selectedRequest.requestedModifications?.cardsToAdd || [],
-        removedCardIds: createPackageData.removedCardIds || selectedRequest.requestedModifications?.cardsToRemove || [],
-        contractPricing: {
-          amount: createPackageData.contractPricing.amount || selectedRequest.requestedModifications?.customPricing?.amount || 0,
-          currency: createPackageData.contractPricing.currency || 'EUR',
-          billingType: createPackageData.contractPricing.billingType || selectedRequest.requestedModifications?.customPricing?.billingType || 'one_time',
-          notes: selectedRequest.requestedModifications?.customPricing?.notes || ''
-        },
-        seatLimit: createPackageData.seatLimit || selectedRequest.requestedModifications?.seatLimit || 1,
-        contract: {
-          startDate: createPackageData.contract.startDate 
-            ? new Date(createPackageData.contract.startDate)
-            : (selectedRequest.requestedModifications?.contractDuration?.startDate 
-              ? new Date(selectedRequest.requestedModifications.contractDuration.startDate)
-              : new Date()),
-          endDate: createPackageData.contract.endDate
-            ? new Date(createPackageData.contract.endDate)
-            : (selectedRequest.requestedModifications?.contractDuration?.endDate
-              ? new Date(selectedRequest.requestedModifications.contractDuration.endDate)
-              : new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)),
-          status: 'active'
-        },
-        status: 'active'
+      // Get selected products to attach
+      const selectedProducts = createPackageData.selectedProductIds || [];
+      
+      if (selectedProducts.length === 0) {
+        setError('Please select at least one product');
+        setSnackbar({
+          open: true,
+          message: 'Please select at least one product',
+          severity: 'error'
+        });
+        setCreating(false);
+        return;
+      }
+      
+      // Convert product IDs to strings
+      const productIds = selectedProducts.map(p => {
+        if (typeof p === 'object' && p._id) {
+          return p._id.toString ? p._id.toString() : String(p._id);
+        }
+        return p.toString ? p.toString() : String(p);
+      });
+      
+      // Prepare data for CustomPackage creation
+      const packageData = {
+        status: 'approved',
+        productIds: productIds
       };
 
-      const customPackageRes = await api.post('/custom-packages', customPackageData);
+      // Add expiry data if available
+      if (createPackageData.expiryTime && createPackageData.expiryTimeUnit) {
+        packageData.expiryTime = createPackageData.expiryTime;
+        packageData.expiryTimeUnit = createPackageData.expiryTimeUnit;
+      }
 
-      // Update request status to completed
-      await api.put(`/custom-package-requests/${selectedRequest._id}/status`, {
-        status: 'completed',
-        customPackageId: customPackageRes.data._id
+      // Add contract pricing if available
+      if (createPackageData.contractPricing?.amount) {
+        packageData.contractPricing = {
+          amount: createPackageData.contractPricing.amount,
+          currency: createPackageData.contractPricing.currency || 'EUR',
+          billingType: createPackageData.contractPricing.billingType || 'one_time'
+        };
+      }
+
+      // Add seat limit if available
+      if (createPackageData.seatLimit) {
+        packageData.seatLimit = createPackageData.seatLimit;
+      }
+
+      // Add contract start date if available
+      if (createPackageData.contract?.startDate) {
+        packageData.contract = {
+          startDate: createPackageData.contract.startDate
+        };
+      }
+
+      // Link selected products to the custom package request
+      // Update request status to approved and link productIds
+      // Also create CustomPackage entry
+      const response = await api.put(`/custom-package-requests/${selectedRequest._id}/status`, packageData);
+
+      // Verify the response was successful
+      if (!response || !response.data) {
+        throw new Error('No response from server');
+      }
+
+      // Verify productIds were saved
+      const updatedRequest = response.data;
+      if (!updatedRequest.productIds || updatedRequest.productIds.length === 0) {
+        console.error('Products were not linked to the request. Response:', updatedRequest);
+        throw new Error('Products were not linked to the request. Please try again.');
+      }
+      
+      // Log success for debugging
+      console.log('Custom package request updated successfully:', {
+        requestId: updatedRequest._id,
+        productIds: updatedRequest.productIds,
+        status: updatedRequest.status
       });
 
       setCreatePackageDialog(false);
       setSelectedRequest(null);
       setCreatePackageData({
         organizationId: '',
+        schoolId: '',
+        entityType: '',
         contractPricing: { amount: '', currency: 'EUR', billingType: 'one_time' },
         seatLimit: '',
-        contract: { startDate: '', endDate: '' }
+        contract: { startDate: '' },
+        expiryTime: null,
+        expiryTimeUnit: null,
+        addedCardIds: [],
+        selectedProductIds: []
       });
-      fetchRequests();
+      
+      // Refresh requests list to show updated data
+      await fetchRequests();
+      
       setError(null);
+      setSnackbar({
+        open: true,
+        message: `Custom package created successfully! ${productIds.length} product(s) linked.`,
+        severity: 'success'
+      });
     } catch (err) {
       console.error('Error creating custom package:', err);
-      setError(err.response?.data?.error || 'Failed to create custom package');
-    } finally {
+      
+      // Extract detailed error message
+      let errorMessage = 'Failed to create custom package';
+      if (err.response?.data) {
+        if (err.response.data.details && Array.isArray(err.response.data.details)) {
+          errorMessage = err.response.data.details.map(d => d.message || d.msg || d).join(', ');
+        } else if (err.response.data.error) {
+          errorMessage = err.response.data.error;
+          if (err.response.data.message) {
+            errorMessage += ': ' + err.response.data.message;
+          }
+        } else if (err.response.data.message) {
+          errorMessage = err.response.data.message;
+        }
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+      
+      // Don't close dialog on error - let user see the error and retry
+      setError(errorMessage);
+      setSnackbar({
+        open: true,
+        message: errorMessage,
+        severity: 'error'
+      });
       setCreating(false);
     }
   };
@@ -446,9 +641,8 @@ export default function CustomPackageRequests() {
         <Table>
           <TableHead>
             <TableRow>
-              <TableCell>Organization</TableCell>
+              <TableCell>Organization/Institute</TableCell>
               <TableCell>Contact</TableCell>
-              <TableCell>Base Package</TableCell>
               <TableCell>Seats</TableCell>
               <TableCell>Status</TableCell>
               <TableCell>Requested Date</TableCell>
@@ -458,7 +652,7 @@ export default function CustomPackageRequests() {
           <TableBody>
             {requests.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} align="center">
+                <TableCell colSpan={6} align="center">
                   <Typography color="text.secondary">No requests found</Typography>
                 </TableCell>
               </TableRow>
@@ -482,17 +676,20 @@ export default function CustomPackageRequests() {
                     )}
                   </TableCell>
                   <TableCell>
-                    <Typography variant="body2">
-                      {request.basePackageId?.name || 'N/A'}
-                    </Typography>
-                  </TableCell>
-                  <TableCell>
                     {request.requestedModifications?.seatLimit || 'N/A'}
                   </TableCell>
                   <TableCell>
                     <Chip
-                      label={getStatusLabel(request.status)}
-                      color={getStatusColor(request.status)}
+                      label={
+                        request.customPackageId 
+                          ? (request.status === 'approved' ? 'Active' : getStatusLabel(request.status))
+                          : getStatusLabel(request.status)
+                      }
+                      color={
+                        request.customPackageId && request.status === 'approved'
+                          ? 'success'
+                          : getStatusColor(request.status)
+                      }
                       size="small"
                     />
                   </TableCell>
@@ -516,7 +713,7 @@ export default function CustomPackageRequests() {
                     >
                       <EditIcon />
                     </IconButton>
-                    {request.status !== 'completed' && (
+                    {request.status !== 'completed' && !request.customPackageId && (
                       <IconButton
                         size="small"
                         onClick={() => handleCreatePackage(request)}
@@ -591,14 +788,6 @@ export default function CustomPackageRequests() {
                     </Typography>
                   </Grid>
                 )}
-                <Grid item xs={12}>
-                  <Typography variant="subtitle2" color="text.secondary">
-                    Base Package
-                  </Typography>
-                  <Typography variant="body1" sx={{ mb: 2 }}>
-                    {selectedRequest.basePackageId?.name || 'N/A'}
-                  </Typography>
-                </Grid>
                 {selectedRequest.requestedModifications?.seatLimit && (
                   <Grid item xs={12} sm={6}>
                     <Typography variant="subtitle2" color="text.secondary">
@@ -764,13 +953,15 @@ export default function CustomPackageRequests() {
         onClose={() => {
           setCreatePackageDialog(false);
           setSelectedRequest(null);
+          setError(null);
           setCreatePackageData({
             organizationId: '',
             contractPricing: { amount: '', currency: 'EUR', billingType: 'one_time' },
             seatLimit: '',
-            contract: { startDate: '', endDate: '' },
-            addedCardIds: [],
-            removedCardIds: []
+            contract: { startDate: '' },
+            expiryTime: null,
+            expiryTimeUnit: null,
+            addedCardIds: []
           });
         }}
         maxWidth="md"
@@ -778,6 +969,11 @@ export default function CustomPackageRequests() {
       >
         <DialogTitle>Create Custom Package</DialogTitle>
         <DialogContent>
+          {error && (
+            <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
+              {error}
+            </Alert>
+          )}
           {selectedRequest && (
             <Box sx={{ mt: 2 }}>
               <Grid container spacing={2}>
@@ -785,30 +981,70 @@ export default function CustomPackageRequests() {
                   <Typography variant="subtitle2" color="text.secondary" gutterBottom>
                     Organization: {selectedRequest.organizationName}
                   </Typography>
-                  <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-                    Base Package: {selectedRequest.basePackageId?.name || 'N/A'}
-                  </Typography>
                 </Grid>
                 <Grid item xs={12}>
-                  <FormControl fullWidth>
-                    <InputLabel>Select Organization (or leave empty to create new)</InputLabel>
+                  <FormControl fullWidth required>
+                    <InputLabel>Entity Type</InputLabel>
                     <Select
-                      value={createPackageData.organizationId}
-                      label="Select Organization (or leave empty to create new)"
+                      value={createPackageData.entityType}
+                      label="Entity Type"
                       onChange={(e) => setCreatePackageData({ 
                         ...createPackageData, 
-                        organizationId: e.target.value 
+                        entityType: e.target.value,
+                        organizationId: '', // Reset when type changes
+                        schoolId: '' // Reset when type changes
                       })}
                     >
-                      <MenuItem value="">Create New Organization</MenuItem>
-                      {organizations.map((org) => (
-                        <MenuItem key={org._id} value={org._id}>
-                          {org.name}
-                        </MenuItem>
-                      ))}
+                      <MenuItem value="">Select Type</MenuItem>
+                      <MenuItem value="organization">Organization</MenuItem>
+                      <MenuItem value="institute">Institute</MenuItem>
                     </Select>
                   </FormControl>
                 </Grid>
+                {createPackageData.entityType === 'organization' && (
+                  <Grid item xs={12}>
+                    <FormControl fullWidth>
+                      <InputLabel>Select Organization (or leave empty to create new)</InputLabel>
+                      <Select
+                        value={createPackageData.organizationId}
+                        label="Select Organization (or leave empty to create new)"
+                        onChange={(e) => setCreatePackageData({ 
+                          ...createPackageData, 
+                          organizationId: e.target.value 
+                        })}
+                      >
+                        <MenuItem value="">Create New Organization</MenuItem>
+                        {organizations.map((org) => (
+                          <MenuItem key={org._id} value={org._id}>
+                            {org.name}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+                  </Grid>
+                )}
+                {createPackageData.entityType === 'institute' && (
+                  <Grid item xs={12}>
+                    <FormControl fullWidth>
+                      <InputLabel>Select Institute (or leave empty to create new)</InputLabel>
+                      <Select
+                        value={createPackageData.schoolId}
+                        label="Select Institute (or leave empty to create new)"
+                        onChange={(e) => setCreatePackageData({ 
+                          ...createPackageData, 
+                          schoolId: e.target.value 
+                        })}
+                      >
+                        <MenuItem value="">Create New Institute</MenuItem>
+                        {schools.map((school) => (
+                          <MenuItem key={school._id} value={school._id}>
+                            {school.name}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+                  </Grid>
+                )}
                 <Grid item xs={12} sm={6}>
                   <TextField
                     fullWidth
@@ -838,16 +1074,34 @@ export default function CustomPackageRequests() {
                   />
                 </Grid>
                 <Grid item xs={12} sm={6}>
+                  <FormControl fullWidth>
+                    <InputLabel>Expiry Time Unit</InputLabel>
+                    <Select
+                      value={createPackageData.expiryTimeUnit || ''}
+                      label="Expiry Time Unit"
+                      onChange={(e) => setCreatePackageData({ 
+                        ...createPackageData, 
+                        expiryTimeUnit: e.target.value 
+                      })}
+                    >
+                      <MenuItem value="">None</MenuItem>
+                      <MenuItem value="months">Months</MenuItem>
+                      <MenuItem value="years">Years</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Grid>
+                <Grid item xs={12} sm={6}>
                   <TextField
                     fullWidth
-                    label="Contract End Date"
-                    type="date"
-                    value={createPackageData.contract.endDate}
+                    label="Expiry Time"
+                    type="number"
+                    value={createPackageData.expiryTime || ''}
                     onChange={(e) => setCreatePackageData({ 
                       ...createPackageData, 
-                      contract: { ...createPackageData.contract, endDate: e.target.value }
+                      expiryTime: e.target.value ? parseInt(e.target.value) : null 
                     })}
-                    InputLabelProps={{ shrink: true }}
+                    disabled={!createPackageData.expiryTimeUnit}
+                    helperText={createPackageData.expiryTimeUnit ? `Enter number of ${createPackageData.expiryTimeUnit}` : 'Select expiry time unit first'}
                   />
                 </Grid>
                 <Grid item xs={12} sm={6}>
@@ -889,100 +1143,117 @@ export default function CustomPackageRequests() {
                   </FormControl>
                 </Grid>
                 
-                {/* Included Cards Section */}
+                {/* Select Products Section */}
                 <Grid item xs={12}>
                   <Divider sx={{ my: 2 }} />
                   <Typography variant="h6" gutterBottom>
-                    Included Cards
+                    Select Products
                   </Typography>
                   <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                    Select which cards should be included in this custom package
+                    Select private products to attach to this custom package
                   </Typography>
                   
-                  {loadingCards ? (
+                  {loadingProducts ? (
                     <Box display="flex" justifyContent="center" p={2}>
                       <CircularProgress size={24} />
                     </Box>
                   ) : (
-                    <Box sx={{ 
-                      maxHeight: 300, 
-                      overflowY: 'auto', 
-                      border: '1px solid #e0e0e0', 
-                      borderRadius: 1, 
-                      p: 2,
-                      backgroundColor: '#f9f9f9'
-                    }}>
-                      <FormGroup>
-                        {allCards.map((card) => {
-                          const cardIdStr = card._id?.toString();
-                          const isSelected = createPackageData.addedCardIds?.some(id => id?.toString() === cardIdStr);
-                          const isBasePackageCard = selectedRequest?.basePackageId?.cardIds?.some(id => id?.toString() === cardIdStr);
-                          
-                          return (
-                            <FormControlLabel
-                              key={card._id}
-                              control={
-                                <Checkbox
-                                  checked={isSelected}
-                                  onChange={(e) => {
-                                    const currentIds = createPackageData.addedCardIds || [];
-                                    const cardIdStr = card._id?.toString();
-                                    if (e.target.checked) {
-                                      setCreatePackageData({
-                                        ...createPackageData,
-                                        addedCardIds: [...currentIds.filter(id => id?.toString() !== cardIdStr), card._id],
-                                        removedCardIds: createPackageData.removedCardIds?.filter(id => id?.toString() !== cardIdStr) || []
-                                      });
-                                    } else {
-                                      setCreatePackageData({
-                                        ...createPackageData,
-                                        addedCardIds: currentIds.filter(id => id?.toString() !== cardIdStr),
-                                        removedCardIds: isBasePackageCard 
-                                          ? [...(createPackageData.removedCardIds || []).filter(id => id?.toString() !== cardIdStr), card._id]
-                                          : createPackageData.removedCardIds?.filter(id => id?.toString() !== cardIdStr) || []
-                                      });
-                                    }
-                                  }}
-                                />
-                              }
-                              label={
-                                <Box display="flex" alignItems="center" gap={1}>
-                                  <Typography variant="body2">
-                                    {card.title || card.name || 'Untitled Card'}
+                    <FormControl fullWidth>
+                      <InputLabel id="products-label">Select Products</InputLabel>
+                      <Select
+                        labelId="products-label"
+                        multiple
+                        value={(createPackageData.selectedProductIds || []).map(id => id?.toString ? id.toString() : String(id))}
+                        onChange={(e) => {
+                          const selectedIds = e.target.value;
+                          // Convert back to product objects/IDs
+                          const products = allProducts.filter(p => {
+                            const pId = p._id?.toString ? p._id.toString() : String(p._id);
+                            return selectedIds.includes(pId) && p.visibility === 'private';
+                          });
+                          setCreatePackageData({
+                            ...createPackageData,
+                            selectedProductIds: products.map(p => p._id)
+                          });
+                        }}
+                        input={<OutlinedInput label="Select Products" />}
+                        renderValue={(selected) => (
+                          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                            {selected.length === 0 ? (
+                              <Typography variant="body2" color="text.secondary">
+                                None selected
+                              </Typography>
+                            ) : (
+                              selected.map((productIdStr) => {
+                                const product = allProducts.find((p) => {
+                                  const pId = p._id?.toString ? p._id.toString() : String(p._id);
+                                  return pId === productIdStr && p.visibility === 'private';
+                                });
+                                if (!product) return null;
+                                return (
+                                  <Chip
+                                    key={productIdStr}
+                                    label={`${product.name} (€${product.price})`}
+                                    size="small"
+                                    sx={{
+                                      backgroundColor: 'rgba(11, 120, 151, 0.1)',
+                                      color: '#0B7897',
+                                      fontWeight: 500,
+                                    }}
+                                  />
+                                );
+                              })
+                            )}
+                          </Box>
+                        )}
+                        MenuProps={{
+                          PaperProps: {
+                            style: {
+                              maxHeight: 300,
+                              width: 'auto',
+                            },
+                          },
+                        }}
+                      >
+                        {allProducts.filter(p => p.visibility === 'private').length === 0 ? (
+                          <MenuItem disabled>No private products available</MenuItem>
+                        ) : (
+                          allProducts.filter(p => p.visibility === 'private').map((product) => {
+                            const productId = product._id?.toString ? product._id.toString() : String(product._id);
+                            return (
+                              <MenuItem key={product._id} value={productId}>
+                                <Box display="flex" alignItems="center" gap={1} flexWrap="wrap" sx={{ width: '100%' }}>
+                                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                    {product.name || 'Untitled Product'}
                                   </Typography>
-                                  {isBasePackageCard && (
-                                    <MuiChip 
-                                      label="Base Package" 
-                                      size="small" 
-                                      color="primary" 
-                                      variant="outlined"
-                                    />
-                                  )}
-                                  {selectedRequest?.requestedModifications?.cardsToAdd?.some(id => id?.toString() === cardIdStr) && (
-                                    <MuiChip 
-                                      label="Requested" 
-                                      size="small" 
-                                      color="success" 
-                                      variant="outlined"
-                                    />
-                                  )}
+                                  <Chip
+                                    label={product.visibility === 'private' ? 'Private' : 'Public'}
+                                    size="small"
+                                    sx={{
+                                      backgroundColor: product.visibility === 'private'
+                                        ? 'rgba(255, 152, 0, 0.1)'
+                                        : 'rgba(76, 175, 80, 0.1)',
+                                      color: product.visibility === 'private'
+                                        ? '#FF9800'
+                                        : '#4CAF50',
+                                      fontSize: '0.7rem',
+                                      height: '20px',
+                                    }}
+                                  />
+                                  <Typography variant="caption" color="text.secondary">
+                                    €{product.price}
+                                  </Typography>
                                 </Box>
-                              }
-                            />
-                          );
-                        })}
-                      </FormGroup>
-                      
-                      {allCards.length === 0 && (
-                        <Typography variant="body2" color="text.secondary" align="center" p={2}>
-                          No cards available
-                        </Typography>
-                      )}
-                    </Box>
+                              </MenuItem>
+                            );
+                          })
+                        )}
+                      </Select>
+                    </FormControl>
                   )}
                   
                   <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-                    Selected: {createPackageData.addedCardIds?.length || 0} card(s)
+                    Selected: {createPackageData.selectedProductIds?.length || 0} product(s)
                   </Typography>
                 </Grid>
               </Grid>
@@ -993,11 +1264,18 @@ export default function CustomPackageRequests() {
           <Button onClick={() => {
             setCreatePackageDialog(false);
             setSelectedRequest(null);
+            setError(null);
             setCreatePackageData({
               organizationId: '',
+              schoolId: '',
+              entityType: '',
               contractPricing: { amount: '', currency: 'EUR', billingType: 'one_time' },
               seatLimit: '',
-              contract: { startDate: '', endDate: '' }
+              contract: { startDate: '' },
+              expiryTime: null,
+              expiryTimeUnit: null,
+              addedCardIds: [],
+              selectedProductIds: []
             });
           }} disabled={creating}>
             Cancel

@@ -766,10 +766,14 @@ import {
   OutlinedInput,
   Chip,
   CircularProgress,
+  Grid,
+  Tabs,
+  Tab,
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
+import VisibilityIcon from '@mui/icons-material/Visibility';
 import axios from 'axios';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
@@ -830,7 +834,14 @@ function ProductsContent() {
   const [badges, setBadges] = useState([]);
   const [allCards, setAllCards] = useState([]);
   const [loadingCards, setLoadingCards] = useState(false);
+  const [allOrganizations, setAllOrganizations] = useState([]);
+  const [loadingOrganizations, setLoadingOrganizations] = useState(false);
+  const [allInstitutes, setAllInstitutes] = useState([]);
+  const [loadingInstitutes, setLoadingInstitutes] = useState(false);
   const [open, setOpen] = useState(false);
+  const [viewDialogOpen, setViewDialogOpen] = useState(false);
+  const [viewingProduct, setViewingProduct] = useState(null);
+  const [accessTab, setAccessTab] = useState(0); // 0 = Organizations, 1 = Institutes
   const [typeDialogOpen, setTypeDialogOpen] = useState(false);
   const [badgeDialogOpen, setBadgeDialogOpen] = useState(false);
   const [badgeDeleteDialogOpen, setBadgeDeleteDialogOpen] = useState(false);
@@ -844,7 +855,6 @@ function ProductsContent() {
   const [uploadingImage, setUploadingImage] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
-    slug: '',
     description: '',
     price: '',
     type: '',
@@ -853,8 +863,12 @@ function ProductsContent() {
     imageUrl: '',
     badges: [],
     isActive: true,
-    sortOrder: 0,
-    cardIds: [],
+    visibility: 'public',
+    allowedOrganizations: [],
+    allowedInstitutes: [],
+    level1: [],
+    level2: [],
+    level3: [],
   });
   const [typeFormData, setTypeFormData] = useState({
     name: '',
@@ -867,6 +881,7 @@ function ProductsContent() {
     message: '',
     severity: 'success',
   });
+  const [visibilityFilter, setVisibilityFilter] = useState('all'); // 'all', 'public', 'private'
 
   // --------- FETCH HELPERS (simple axios) ----------
 
@@ -1007,6 +1022,64 @@ function ProductsContent() {
       setLoadingCards(false);
     }
   };
+
+  const fetchOrganizations = async () => {
+    try {
+      setLoadingOrganizations(true);
+      const headers = getAuthHeaders({
+        'Cache-Control': 'no-store',
+        Pragma: 'no-cache',
+      });
+  
+      const url = `${API_URL}/organizations/admin`;
+      const params = { _t: Date.now() };
+  
+      console.log('📡 API: GET', url, params);
+      const res = await axios.get(url, { headers, params });
+  
+      const orgsData = Array.isArray(res.data) ? res.data : [];
+      console.log('📦 Organizations fetched:', orgsData.length, 'items');
+      setAllOrganizations(orgsData);
+    } catch (error) {
+      console.error('❌ Error fetching organizations:', {
+        url: `${API_URL}/organizations/admin`,
+        error: error.response?.data || error.message,
+        status: error.response?.status,
+      });
+      setAllOrganizations([]);
+    } finally {
+      setLoadingOrganizations(false);
+    }
+  };
+
+  const fetchInstitutes = async () => {
+    try {
+      setLoadingInstitutes(true);
+      const headers = getAuthHeaders({
+        'Cache-Control': 'no-store',
+        Pragma: 'no-cache',
+      });
+  
+      const url = `${API_URL}/schools/admin`;
+      const params = { _t: Date.now() };
+  
+      console.log('📡 API: GET', url, params);
+      const res = await axios.get(url, { headers, params });
+  
+      const institutesData = Array.isArray(res.data) ? res.data : [];
+      console.log('📦 Institutes fetched:', institutesData.length, 'items');
+      setAllInstitutes(institutesData);
+    } catch (error) {
+      console.error('❌ Error fetching institutes:', {
+        url: `${API_URL}/schools/admin`,
+        error: error.response?.data || error.message,
+        status: error.response?.status,
+      });
+      setAllInstitutes([]);
+    } finally {
+      setLoadingInstitutes(false);
+    }
+  };
     
 
 
@@ -1061,6 +1134,8 @@ function ProductsContent() {
     fetchProductTypes();
     fetchBadges();
     fetchCards();
+    fetchOrganizations();
+    fetchInstitutes();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -1071,7 +1146,6 @@ function ProductsContent() {
       setEditing(product);
       setFormData({
         name: product.name,
-        slug: product.slug,
         description: product.description,
         price: product.price.toString(),
         type: product.type || '',
@@ -1080,14 +1154,23 @@ function ProductsContent() {
         imageUrl: product.imageUrl,
         badges: product.badges || [],
         isActive: product.isActive,
-        sortOrder: product.sortOrder,
-        cardIds: product.cardIds?.map(card => typeof card === 'object' ? card._id : card) || [],
+        visibility: product.visibility || 'public',
+        allowedOrganizations: product.allowedOrganizations?.map(org => {
+          const id = typeof org === 'object' ? org._id : org;
+          return id?.toString ? id.toString() : String(id);
+        }) || [],
+        allowedInstitutes: product.allowedInstitutes?.map(inst => {
+          const id = typeof inst === 'object' ? inst._id : inst;
+          return id?.toString ? id.toString() : String(id);
+        }) || [],
+        level1: product.level1?.map(card => typeof card === 'object' ? card._id : card) || [],
+        level2: product.level2?.map(card => typeof card === 'object' ? card._id : card) || [],
+        level3: product.level3?.map(card => typeof card === 'object' ? card._id : card) || [],
       });
     } else {
       setEditing(null);
       setFormData({
         name: '',
-        slug: '',
         description: '',
         price: '',
         type: '',
@@ -1096,10 +1179,15 @@ function ProductsContent() {
         imageUrl: '',
         badges: [],
         isActive: true,
-        sortOrder: 0,
-        cardIds: [],
+        visibility: 'public',
+        allowedOrganizations: [],
+        allowedInstitutes: [],
+        level1: [],
+        level2: [],
+        level3: [],
       });
     }
+    setAccessTab(0); // Reset to Organizations tab
     setOpen(true);
   };
 
@@ -1266,6 +1354,16 @@ function ProductsContent() {
     setEditing(null);
   };
 
+  const handleView = (product) => {
+    setViewingProduct(product);
+    setViewDialogOpen(true);
+  };
+
+  const handleViewClose = () => {
+    setViewDialogOpen(false);
+    setViewingProduct(null);
+  };
+
   const handleSubmit = async () => {
     try {
       // validation
@@ -1273,14 +1371,6 @@ function ProductsContent() {
         setSnackbar({
           open: true,
           message: 'Product name is required',
-          severity: 'error',
-        });
-        return;
-      }
-      if (!formData.slug.trim()) {
-        setSnackbar({
-          open: true,
-          message: 'Product slug is required',
           severity: 'error',
         });
         return;
@@ -1319,14 +1409,21 @@ function ProductsContent() {
       }
 
       const payload = {
-        ...formData,
+        name: formData.name.trim(),
+        description: formData.description.trim(),
         price: parseFloat(formData.price),
-        badges: formData.badges,
-        sortOrder: parseInt(formData.sortOrder.toString(), 10) || 0,
-        cardIds: formData.cardIds || [],
-        // Always include category and targetAudience (even if empty, to clear them)
+        type: formData.type,
         category: formData.category || null,
         targetAudience: formData.targetAudience || null,
+        imageUrl: formData.imageUrl,
+        badges: formData.badges || [],
+        isActive: formData.isActive,
+        visibility: formData.visibility || 'public',
+        allowedOrganizations: formData.visibility === 'private' ? (formData.allowedOrganizations || []) : [],
+        allowedInstitutes: formData.visibility === 'private' ? (formData.allowedInstitutes || []) : [],
+        level1: formData.level1 || [],
+        level2: formData.level2 || [],
+        level3: formData.level3 || [],
       };
 
       const headers = getAuthHeaders();
@@ -1543,21 +1640,55 @@ function ProductsContent() {
           }}
         >
           <Typography variant="h4">Products</Typography>
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={() => handleOpen()}
-            sx={{
-              bgcolor: 'primary.main',
-              '&:hover': {
-                bgcolor: 'primary.dark',
-                boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-              },
-              transition: 'all 0.3s ease',
-            }}
-          >
-            Add Product
-          </Button>
+          <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+            <FormControl size="small" sx={{ minWidth: 150, mt: 1 }}>
+              <InputLabel 
+                sx={{ 
+                  zIndex: 1,
+                  backgroundColor: 'white',
+                  px: 0.5,
+                  '&.MuiInputLabel-shrink': {
+                    zIndex: 1,
+                    backgroundColor: 'white',
+                    px: 0.5,
+                  },
+                }}
+              >
+                Filter by Visibility
+              </InputLabel>
+              <Select
+                value={visibilityFilter}
+                label="Filter by Visibility"
+                onChange={(e) => setVisibilityFilter(e.target.value)}
+                sx={{
+                  '& .MuiSelect-select': {
+                    whiteSpace: 'nowrap',
+                    overflow: 'visible',
+                    textOverflow: 'clip',
+                  },
+                }}
+              >
+                <MenuItem value="all">All</MenuItem>
+                <MenuItem value="public">Public</MenuItem>
+                <MenuItem value="private">Private</MenuItem>
+              </Select>
+            </FormControl>
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={() => handleOpen()}
+              sx={{
+                bgcolor: 'primary.main',
+                '&:hover': {
+                  bgcolor: 'primary.dark',
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                },
+                transition: 'all 0.3s ease',
+              }}
+            >
+              Add Product
+            </Button>
+          </Box>
         </Box>
 
         <TableContainer 
@@ -1590,6 +1721,7 @@ function ProductsContent() {
                 <TableCell>Cards</TableCell>
                 <TableCell>Target Audience</TableCell>
                 <TableCell>Price</TableCell>
+                <TableCell>Visibility</TableCell>
                 <TableCell>Active</TableCell>
                 <TableCell>Actions</TableCell>
               </TableRow>
@@ -1597,21 +1729,30 @@ function ProductsContent() {
             <TableBody>
               {loadingProducts ? (
                 <TableRow>
-                  <TableCell colSpan={8} align="center" sx={{ py: 5 }}>
+                  <TableCell colSpan={9} align="center" sx={{ py: 5 }}>
                     <CircularProgress size={32} />
                   </TableCell>
                 </TableRow>
-              ) : products.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={8} align="center" sx={{ py: 4 }}>
-                    <Typography variant="body2" color="text.secondary">
-                      No products found. Click &ldquo;Add Product&rdquo; to
-                      create your first product.
-                    </Typography>
-                  </TableCell>
-                </TableRow>
-              ) : (
-                products.map((product) => {
+              ) : (() => {
+                const filteredProducts = products.filter((product) => {
+                  if (visibilityFilter === 'all') return true;
+                  return product.visibility === visibilityFilter;
+                });
+                
+                if (filteredProducts.length === 0) {
+                  return (
+                    <TableRow key="no-products">
+                      <TableCell colSpan={9} align="center" sx={{ py: 4 }}>
+                        <Typography variant="body2" color="text.secondary">
+                          No products found{visibilityFilter !== 'all' ? ` with ${visibilityFilter} visibility` : ''}. Click &ldquo;Add Product&rdquo; to
+                          create your first product.
+                        </Typography>
+                      </TableCell>
+                    </TableRow>
+                  );
+                }
+                
+                return filteredProducts.map((product) => {
                   // Format target audience for display
                   const getTargetAudienceLabel = (targetAudience) => {
                     if (!targetAudience) return '-';
@@ -1658,21 +1799,30 @@ function ProductsContent() {
                       <TableCell>{product.name}</TableCell>
                       <TableCell>{product.type}</TableCell>
                       <TableCell>
-                        {product.cardIds && product.cardIds.length > 0 ? (
-                          <Chip
-                            label={`${product.cardIds.length} card${product.cardIds.length !== 1 ? 's' : ''}`}
-                            size="small"
-                            sx={{
-                              backgroundColor: 'rgba(11, 120, 151, 0.1)',
-                              color: '#0B7897',
-                              fontWeight: 500,
-                            }}
-                          />
-                        ) : (
-                          <Typography variant="caption" color="text.secondary">
-                            No cards
-                          </Typography>
-                        )}
+                        {(() => {
+                          const totalCards = (product.level1?.length || 0) + (product.level2?.length || 0) + (product.level3?.length || 0);
+                          const legacyCards = product.cardIds?.length || 0;
+                          const total = totalCards || legacyCards;
+                          
+                          if (total > 0) {
+                            return (
+                              <Chip
+                                label={`${total} card${total !== 1 ? 's' : ''}`}
+                                size="small"
+                                sx={{
+                                  backgroundColor: 'rgba(11, 120, 151, 0.1)',
+                                  color: '#0B7897',
+                                  fontWeight: 500,
+                                }}
+                              />
+                            );
+                          }
+                          return (
+                            <Typography variant="caption" color="text.secondary">
+                              No cards
+                            </Typography>
+                          );
+                        })()}
                       </TableCell>
                       <TableCell>
                         <Chip
@@ -1700,25 +1850,51 @@ function ProductsContent() {
                         />
                       </TableCell>
                       <TableCell>€{product.price}</TableCell>
+                      <TableCell>
+                        <Chip
+                          label={product.visibility === 'private' ? 'Private' : 'Public'}
+                          size="small"
+                          sx={{
+                            backgroundColor:
+                              product.visibility === 'private'
+                                ? 'rgba(255, 152, 0, 0.1)'
+                                : 'rgba(76, 175, 80, 0.1)',
+                            color:
+                              product.visibility === 'private'
+                                ? '#FF9800'
+                                : '#4CAF50',
+                            fontWeight: 600,
+                          }}
+                        />
+                      </TableCell>
                       <TableCell>{product.isActive ? 'Yes' : 'No'}</TableCell>
                       <TableCell>
                         <IconButton
                           size="small"
+                          onClick={() => handleView(product)}
+                          title="View"
+                        >
+                          <VisibilityIcon />
+                        </IconButton>
+                        <IconButton
+                          size="small"
                           onClick={() => handleOpen(product)}
+                          title="Edit"
                         >
                           <EditIcon />
                         </IconButton>
                         <IconButton
                           size="small"
                           onClick={() => handleDeleteClick(product)}
+                          title="Delete"
                         >
                           <DeleteIcon />
                         </IconButton>
                       </TableCell>
                     </TableRow>
                   );
-                })
-              )}
+                });
+              })()}
             </TableBody>
           </Table>
         </TableContainer>
@@ -1742,15 +1918,6 @@ function ProductsContent() {
                 value={formData.name}
                 onChange={(e) =>
                   setFormData({ ...formData, name: e.target.value })
-                }
-              />
-              <TextField
-                label="Slug"
-                fullWidth
-                required
-                value={formData.slug}
-                onChange={(e) =>
-                  setFormData({ ...formData, slug: e.target.value })
                 }
               />
               <TextField
@@ -1828,6 +1995,167 @@ function ProductsContent() {
                 <MenuItem value="schools">Schools (B2E)</MenuItem>
                 <MenuItem value="businesses">Businesses (B2B)</MenuItem>
               </TextField>
+              
+              {/* Visibility Toggle */}
+              <FormControl fullWidth>
+                <InputLabel id="visibility-label">Visibility</InputLabel>
+                <Select
+                  labelId="visibility-label"
+                  value={formData.visibility}
+                  onChange={(e) =>
+                    setFormData({ ...formData, visibility: e.target.value })
+                  }
+                  input={<OutlinedInput label="Visibility" />}
+                >
+                  <MenuItem value="public">Public (Show on website)</MenuItem>
+                  <MenuItem value="private">Private (Only selected organizations/institutes)</MenuItem>
+                </Select>
+                <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5 }}>
+                  {formData.visibility === 'public' 
+                    ? 'This product will be visible on the public website.'
+                    : 'This product will only be visible to selected organizations/institutes.'}
+                </Typography>
+              </FormControl>
+
+              {/* Private Access Selection - Only show when visibility is private */}
+              {formData.visibility === 'private' && (
+                <Box sx={{ mt: 2 }}>
+                  <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 'bold' }}>
+                    Select Access
+                  </Typography>
+                  <Tabs value={accessTab} onChange={(e, newValue) => setAccessTab(newValue)} sx={{ mb: 2 }}>
+                    <Tab label="Organizations" />
+                    <Tab label="Institutes" />
+                  </Tabs>
+                  
+                  {/* Organizations Tab */}
+                  {accessTab === 0 && (
+                    <FormControl fullWidth>
+                      <InputLabel id="organizations-label">Select Organizations</InputLabel>
+                      <Select
+                        labelId="organizations-label"
+                        multiple
+                        value={formData.allowedOrganizations || []}
+                        onChange={(e) =>
+                          setFormData({ ...formData, allowedOrganizations: e.target.value })
+                        }
+                        input={<OutlinedInput label="Select Organizations" />}
+                        renderValue={(selected) => (
+                          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                            {selected.length === 0 ? (
+                              <Typography variant="body2" color="text.secondary">
+                                None selected
+                              </Typography>
+                            ) : (
+                              selected.map((orgId) => {
+                                const org = allOrganizations.find((o) => {
+                                  const oId = o._id?.toString ? o._id.toString() : String(o._id);
+                                  const sId = orgId?.toString ? orgId.toString() : String(orgId);
+                                  return oId === sId;
+                                });
+                                return (
+                                  <Chip
+                                    key={orgId}
+                                    label={org?.name || orgId}
+                                    size="small"
+                                    sx={{
+                                      backgroundColor: 'rgba(11, 120, 151, 0.08)',
+                                      color: '#0B7897',
+                                      fontWeight: 500,
+                                    }}
+                                  />
+                                );
+                              })
+                            )}
+                          </Box>
+                        )}
+                        disabled={loadingOrganizations}
+                      >
+                        {loadingOrganizations ? (
+                          <MenuItem disabled>
+                            <CircularProgress size={20} sx={{ mr: 1 }} />
+                            Loading...
+                          </MenuItem>
+                        ) : allOrganizations.length === 0 ? (
+                          <MenuItem disabled>No organizations available</MenuItem>
+                        ) : (
+                          allOrganizations.map((org) => (
+                            <MenuItem key={org._id} value={org._id}>
+                              {org.name || 'Untitled Organization'}
+                            </MenuItem>
+                          ))
+                        )}
+                      </Select>
+                      <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5 }}>
+                        Select organizations that should have access to this private product.
+                      </Typography>
+                    </FormControl>
+                  )}
+                  
+                  {/* Institutes Tab */}
+                  {accessTab === 1 && (
+                    <FormControl fullWidth>
+                      <InputLabel id="institutes-label">Select Institutes</InputLabel>
+                      <Select
+                        labelId="institutes-label"
+                        multiple
+                        value={formData.allowedInstitutes || []}
+                        onChange={(e) =>
+                          setFormData({ ...formData, allowedInstitutes: e.target.value })
+                        }
+                        input={<OutlinedInput label="Select Institutes" />}
+                        renderValue={(selected) => (
+                          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                            {selected.length === 0 ? (
+                              <Typography variant="body2" color="text.secondary">
+                                None selected
+                              </Typography>
+                            ) : (
+                              selected.map((instId) => {
+                                const inst = allInstitutes.find((i) => i._id === instId);
+                                return (
+                                  <Chip
+                                    key={instId}
+                                    label={inst?.name || instId}
+                                    size="small"
+                                    sx={{
+                                      backgroundColor: 'rgba(11, 120, 151, 0.08)',
+                                      color: '#0B7897',
+                                      fontWeight: 500,
+                                    }}
+                                  />
+                                );
+                              })
+                            )}
+                          </Box>
+                        )}
+                        disabled={loadingInstitutes}
+                      >
+                        {loadingInstitutes ? (
+                          <MenuItem disabled>
+                            <CircularProgress size={20} sx={{ mr: 1 }} />
+                            Loading...
+                          </MenuItem>
+                        ) : allInstitutes.length === 0 ? (
+                          <MenuItem disabled>No institutes available</MenuItem>
+                        ) : (
+                          allInstitutes.map((inst) => {
+                            const instId = inst._id?.toString ? inst._id.toString() : String(inst._id);
+                            return (
+                              <MenuItem key={instId} value={instId}>
+                                {inst.name || 'Untitled Institute'}
+                              </MenuItem>
+                            );
+                          })
+                        )}
+                      </Select>
+                      <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5 }}>
+                        Select institutes that should have access to this private product.
+                      </Typography>
+                    </FormControl>
+                  )}
+                </Box>
+              )}
               
               {/* Commented out Add Type button - using fixed list instead */}
               {/* <Button
@@ -1941,104 +2269,255 @@ function ProductsContent() {
                 </Select>
               </FormControl>
               
-              {/* Attached Cards Selection */}
-              <FormControl fullWidth>
-                <InputLabel id="cards-label">Attached Cards</InputLabel>
-                <Select
-                  labelId="cards-label"
-                  multiple
-                  value={formData.cardIds}
-                  onChange={(e) =>
-                    setFormData({ ...formData, cardIds: e.target.value })
-                  }
-                  input={<OutlinedInput label="Attached Cards" />}
-                  renderValue={(selected) => (
-                    <Box
-                      sx={{
-                        display: 'flex',
-                        flexWrap: 'wrap',
-                        gap: 0.5,
-                      }}
-                    >
-                      {selected.length === 0 ? (
-                        <Typography variant="body2" color="text.secondary">
-                          No cards selected
-                        </Typography>
-                      ) : (
-                        selected.map((cardId) => {
-                          const card = allCards.find((c) => c._id === cardId);
-                          const levelCount = card?.levels?.length || 0;
-                          return (
-                            <Chip
-                              key={cardId}
-                              label={
-                                card
-                                  ? `${card.title || 'Untitled'} (${levelCount} level${levelCount !== 1 ? 's' : ''})`
-                                  : cardId
-                              }
-                              size="small"
-                              sx={{
-                                backgroundColor: 'rgba(11, 120, 151, 0.08)',
-                                color: '#0B7897',
-                                fontWeight: 500,
-                              }}
-                            />
-                          );
-                        })
-                      )}
-                    </Box>
-                  )}
-                  MenuProps={{
-                    PaperProps: {
-                      style: {
-                        maxHeight: 400,
-                        width: 'auto',
-                      },
-                    },
-                  }}
-                  disabled={loadingCards}
-                >
-                  {loadingCards ? (
-                    <MenuItem disabled>
-                      <CircularProgress size={20} sx={{ mr: 1 }} />
-                      Loading cards...
-                    </MenuItem>
-                  ) : allCards.length === 0 ? (
-                    <MenuItem disabled>No cards available</MenuItem>
-                  ) : (
-                    allCards.map((card) => {
-                      const levelCount = card.levels?.length || 0;
-                      return (
-                        <MenuItem key={card._id} value={card._id}>
-                          <Box>
-                            <Typography variant="body2" fontWeight={500}>
-                              {card.title || 'Untitled Card'}
-                            </Typography>
-                            <Typography variant="caption" color="text.secondary">
-                              {card.category || 'No category'} • {levelCount} level{levelCount !== 1 ? 's' : ''}
-                            </Typography>
-                          </Box>
-                        </MenuItem>
-                      );
-                    })
-                  )}
-                </Select>
-                <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5 }}>
-                  Select cards to attach to this product. Users will gain access to these cards when purchasing.
-                </Typography>
-              </FormControl>
-              <TextField
-                label="Sort Order"
-                type="number"
-                fullWidth
-                value={formData.sortOrder}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    sortOrder: parseInt(e.target.value, 10) || 0,
-                  })
-                }
-              />
+              {/* Level-based Card Selection - Only show when target audience is selected */}
+              {formData.targetAudience && (
+                <>
+                  <Typography variant="subtitle1" sx={{ mt: 2, mb: 1, fontWeight: 'bold' }}>
+                    Attach Cards by Level
+                  </Typography>
+                  <Grid container spacing={2}>
+                    {/* Level 1 Dropdown */}
+                    <Grid item xs={12} md={4}>
+                      <FormControl fullWidth>
+                        <InputLabel id="level1-label">Level 1 Cards</InputLabel>
+                        <Select
+                          labelId="level1-label"
+                          multiple
+                          value={formData.level1 || []}
+                          onChange={(e) =>
+                            setFormData({ ...formData, level1: e.target.value })
+                          }
+                          input={<OutlinedInput label="Level 1 Cards" />}
+                          renderValue={(selected) => (
+                            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                              {selected.length === 0 ? (
+                                <Typography variant="body2" color="text.secondary">
+                                  None
+                                </Typography>
+                              ) : (
+                                selected.map((cardId) => {
+                                  const card = allCards.find((c) => c._id === cardId);
+                                  return (
+                                    <Chip
+                                      key={cardId}
+                                      label={card?.title || cardId}
+                                      size="small"
+                                      sx={{
+                                        backgroundColor: 'rgba(11, 120, 151, 0.08)',
+                                        color: '#0B7897',
+                                        fontWeight: 500,
+                                      }}
+                                    />
+                                  );
+                                })
+                              )}
+                            </Box>
+                          )}
+                          disabled={loadingCards}
+                        >
+                          {loadingCards ? (
+                            <MenuItem disabled>
+                              <CircularProgress size={20} sx={{ mr: 1 }} />
+                              Loading...
+                            </MenuItem>
+                          ) : allCards.filter(card => {
+                            // Filter cards by target audience
+                            if (!card.targetAudiences || card.targetAudiences.length === 0) return false;
+                            const targetMap = {
+                              'private-users': 'B2C',
+                              'schools': 'B2E',
+                              'businesses': 'B2B'
+                            };
+                            const targetValue = targetMap[formData.targetAudience];
+                            return card.targetAudiences.includes(targetValue);
+                          }).length === 0 ? (
+                            <MenuItem disabled>No cards available for this target audience</MenuItem>
+                          ) : (
+                            allCards
+                              .filter(card => {
+                                // Filter cards by target audience
+                                if (!card.targetAudiences || card.targetAudiences.length === 0) return false;
+                                const targetMap = {
+                                  'private-users': 'B2C',
+                                  'schools': 'B2E',
+                                  'businesses': 'B2B'
+                                };
+                                const targetValue = targetMap[formData.targetAudience];
+                                return card.targetAudiences.includes(targetValue);
+                              })
+                              .map((card) => (
+                                <MenuItem key={card._id} value={card._id}>
+                                  {card.title || 'Untitled Card'}
+                                </MenuItem>
+                              ))
+                          )}
+                        </Select>
+                      </FormControl>
+                    </Grid>
+
+                    {/* Level 2 Dropdown */}
+                    <Grid item xs={12} md={4}>
+                      <FormControl fullWidth>
+                        <InputLabel id="level2-label">Level 2 Cards</InputLabel>
+                        <Select
+                          labelId="level2-label"
+                          multiple
+                          value={formData.level2 || []}
+                          onChange={(e) =>
+                            setFormData({ ...formData, level2: e.target.value })
+                          }
+                          input={<OutlinedInput label="Level 2 Cards" />}
+                          renderValue={(selected) => (
+                            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                              {selected.length === 0 ? (
+                                <Typography variant="body2" color="text.secondary">
+                                  None
+                                </Typography>
+                              ) : (
+                                selected.map((cardId) => {
+                                  const card = allCards.find((c) => c._id === cardId);
+                                  return (
+                                    <Chip
+                                      key={cardId}
+                                      label={card?.title || cardId}
+                                      size="small"
+                                      sx={{
+                                        backgroundColor: 'rgba(11, 120, 151, 0.08)',
+                                        color: '#0B7897',
+                                        fontWeight: 500,
+                                      }}
+                                    />
+                                  );
+                                })
+                              )}
+                            </Box>
+                          )}
+                          disabled={loadingCards}
+                        >
+                          {loadingCards ? (
+                            <MenuItem disabled>
+                              <CircularProgress size={20} sx={{ mr: 1 }} />
+                              Loading...
+                            </MenuItem>
+                          ) : allCards.filter(card => {
+                            // Filter cards by target audience
+                            if (!card.targetAudiences || card.targetAudiences.length === 0) return false;
+                            const targetMap = {
+                              'private-users': 'B2C',
+                              'schools': 'B2E',
+                              'businesses': 'B2B'
+                            };
+                            const targetValue = targetMap[formData.targetAudience];
+                            return card.targetAudiences.includes(targetValue);
+                          }).length === 0 ? (
+                            <MenuItem disabled>No cards available for this target audience</MenuItem>
+                          ) : (
+                            allCards
+                              .filter(card => {
+                                // Filter cards by target audience
+                                if (!card.targetAudiences || card.targetAudiences.length === 0) return false;
+                                const targetMap = {
+                                  'private-users': 'B2C',
+                                  'schools': 'B2E',
+                                  'businesses': 'B2B'
+                                };
+                                const targetValue = targetMap[formData.targetAudience];
+                                return card.targetAudiences.includes(targetValue);
+                              })
+                              .map((card) => (
+                                <MenuItem key={card._id} value={card._id}>
+                                  {card.title || 'Untitled Card'}
+                                </MenuItem>
+                              ))
+                          )}
+                        </Select>
+                      </FormControl>
+                    </Grid>
+
+                    {/* Level 3 Dropdown */}
+                    <Grid item xs={12} md={4}>
+                      <FormControl fullWidth>
+                        <InputLabel id="level3-label">Level 3 Cards</InputLabel>
+                        <Select
+                          labelId="level3-label"
+                          multiple
+                          value={formData.level3 || []}
+                          onChange={(e) =>
+                            setFormData({ ...formData, level3: e.target.value })
+                          }
+                          input={<OutlinedInput label="Level 3 Cards" />}
+                          renderValue={(selected) => (
+                            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                              {selected.length === 0 ? (
+                                <Typography variant="body2" color="text.secondary">
+                                  None
+                                </Typography>
+                              ) : (
+                                selected.map((cardId) => {
+                                  const card = allCards.find((c) => c._id === cardId);
+                                  return (
+                                    <Chip
+                                      key={cardId}
+                                      label={card?.title || cardId}
+                                      size="small"
+                                      sx={{
+                                        backgroundColor: 'rgba(11, 120, 151, 0.08)',
+                                        color: '#0B7897',
+                                        fontWeight: 500,
+                                      }}
+                                    />
+                                  );
+                                })
+                              )}
+                            </Box>
+                          )}
+                          disabled={loadingCards}
+                        >
+                          {loadingCards ? (
+                            <MenuItem disabled>
+                              <CircularProgress size={20} sx={{ mr: 1 }} />
+                              Loading...
+                            </MenuItem>
+                          ) : allCards.filter(card => {
+                            // Filter cards by target audience
+                            if (!card.targetAudiences || card.targetAudiences.length === 0) return false;
+                            const targetMap = {
+                              'private-users': 'B2C',
+                              'schools': 'B2E',
+                              'businesses': 'B2B'
+                            };
+                            const targetValue = targetMap[formData.targetAudience];
+                            return card.targetAudiences.includes(targetValue);
+                          }).length === 0 ? (
+                            <MenuItem disabled>No cards available for this target audience</MenuItem>
+                          ) : (
+                            allCards
+                              .filter(card => {
+                                // Filter cards by target audience
+                                if (!card.targetAudiences || card.targetAudiences.length === 0) return false;
+                                const targetMap = {
+                                  'private-users': 'B2C',
+                                  'schools': 'B2E',
+                                  'businesses': 'B2B'
+                                };
+                                const targetValue = targetMap[formData.targetAudience];
+                                return card.targetAudiences.includes(targetValue);
+                              })
+                              .map((card) => (
+                                <MenuItem key={card._id} value={card._id}>
+                                  {card.title || 'Untitled Card'}
+                                </MenuItem>
+                              ))
+                          )}
+                        </Select>
+                      </FormControl>
+                    </Grid>
+                  </Grid>
+                  <Typography variant="caption" color="text.secondary" sx={{ mt: 1 }}>
+                    Select cards for each level. Cards are filtered by the selected target audience.
+                  </Typography>
+                </>
+              )}
               <FormControlLabel
                 control={
                   <Switch
@@ -2304,6 +2783,305 @@ function ProductsContent() {
             >
               Delete
             </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* View Product Dialog */}
+        <Dialog open={viewDialogOpen} onClose={handleViewClose} maxWidth="md" fullWidth>
+          <DialogTitle>View Product</DialogTitle>
+          <DialogContent>
+            {viewingProduct && (
+              <Box sx={{ pt: 2 }}>
+                <Grid container spacing={2}>
+                  <Grid item xs={12}>
+                    <Typography variant="subtitle2" color="text.secondary">
+                      Name
+                    </Typography>
+                    <Typography variant="body1" sx={{ mb: 2 }}>
+                      {viewingProduct.name}
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={12}>
+                    <Typography variant="subtitle2" color="text.secondary">
+                      Description
+                    </Typography>
+                    <Typography variant="body1" sx={{ mb: 2 }}>
+                      {viewingProduct.description || 'N/A'}
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <Typography variant="subtitle2" color="text.secondary">
+                      Price
+                    </Typography>
+                    <Typography variant="body1" sx={{ mb: 2 }}>
+                      €{viewingProduct.price}
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <Typography variant="subtitle2" color="text.secondary">
+                      Type
+                    </Typography>
+                    <Typography variant="body1" sx={{ mb: 2 }}>
+                      {viewingProduct.type || 'N/A'}
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <Typography variant="subtitle2" color="text.secondary">
+                      Category
+                    </Typography>
+                    <Typography variant="body1" sx={{ mb: 2 }}>
+                      {viewingProduct.category || 'N/A'}
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <Typography variant="subtitle2" color="text.secondary">
+                      Target Audience
+                    </Typography>
+                    <Typography variant="body1" sx={{ mb: 2 }}>
+                      {viewingProduct.targetAudience === 'private-users' ? 'B2C' :
+                       viewingProduct.targetAudience === 'schools' ? 'B2E' :
+                       viewingProduct.targetAudience === 'businesses' ? 'B2B' :
+                       viewingProduct.targetAudience || 'N/A'}
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <Typography variant="subtitle2" color="text.secondary">
+                      Visibility
+                    </Typography>
+                    <Chip
+                      label={viewingProduct.visibility === 'private' ? 'Private' : 'Public'}
+                      size="small"
+                      sx={{
+                        backgroundColor:
+                          viewingProduct.visibility === 'private'
+                            ? 'rgba(255, 152, 0, 0.1)'
+                            : 'rgba(76, 175, 80, 0.1)',
+                        color:
+                          viewingProduct.visibility === 'private'
+                            ? '#FF9800'
+                            : '#4CAF50',
+                        fontWeight: 600,
+                        mt: 1,
+                      }}
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <Typography variant="subtitle2" color="text.secondary">
+                      Active
+                    </Typography>
+                    <Typography variant="body1" sx={{ mb: 2 }}>
+                      {viewingProduct.isActive ? 'Yes' : 'No'}
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={12}>
+                    <Typography variant="subtitle2" color="text.secondary" sx={{ fontWeight: 'bold', mb: 1 }}>
+                      Cards by Level
+                    </Typography>
+                    <Box sx={{ mb: 2 }}>
+                      <Typography variant="body2" sx={{ mb: 1 }}>
+                        <strong>Level 1:</strong> {viewingProduct.level1?.length || 0} cards
+                      </Typography>
+                      <Typography variant="body2" sx={{ mb: 1 }}>
+                        <strong>Level 2:</strong> {viewingProduct.level2?.length || 0} cards
+                      </Typography>
+                      <Typography variant="body2" sx={{ mb: 1 }}>
+                        <strong>Level 3:</strong> {viewingProduct.level3?.length || 0} cards
+                      </Typography>
+                      {viewingProduct.cardIds && viewingProduct.cardIds.length > 0 && (
+                        <Typography variant="body2" sx={{ mb: 1, color: 'text.secondary' }}>
+                          <strong>Legacy Cards:</strong> {viewingProduct.cardIds.length} cards
+                        </Typography>
+                      )}
+                      <Typography variant="body2" sx={{ mt: 1, fontWeight: 'bold' }}>
+                        <strong>Total:</strong> {(() => {
+                          const totalCards = (viewingProduct.level1?.length || 0) + 
+                                            (viewingProduct.level2?.length || 0) + 
+                                            (viewingProduct.level3?.length || 0);
+                          const legacyCards = viewingProduct.cardIds?.length || 0;
+                          return totalCards || legacyCards || 0;
+                        })()} cards
+                      </Typography>
+                    </Box>
+                  </Grid>
+                  {viewingProduct.imageUrl && (
+                    <Grid item xs={12}>
+                      <Typography variant="subtitle2" color="text.secondary">
+                        Image
+                      </Typography>
+                      <Box
+                        component="img"
+                        src={viewingProduct.imageUrl}
+                        alt={viewingProduct.name}
+                        sx={{
+                          width: '100%',
+                          maxWidth: 400,
+                          height: 'auto',
+                          borderRadius: 1,
+                          mt: 1,
+                        }}
+                      />
+                    </Grid>
+                  )}
+                  {viewingProduct.badges && viewingProduct.badges.length > 0 && (
+                    <Grid item xs={12}>
+                      <Typography variant="subtitle2" color="text.secondary">
+                        Badges
+                      </Typography>
+                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 1 }}>
+                        {viewingProduct.badges.map((badge, index) => (
+                          <Chip
+                            key={index}
+                            label={badge}
+                            size="small"
+                            sx={{
+                              backgroundColor: 'rgba(11, 120, 151, 0.1)',
+                              color: '#0B7897',
+                              fontWeight: 500,
+                            }}
+                          />
+                        ))}
+                      </Box>
+                    </Grid>
+                  )}
+                  {viewingProduct.visibility === 'private' && (
+                    <>
+                      {viewingProduct.allowedOrganizations && viewingProduct.allowedOrganizations.length > 0 && (
+                        <Grid item xs={12}>
+                          <Typography variant="subtitle2" color="text.secondary">
+                            Allowed Organizations
+                          </Typography>
+                          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 1 }}>
+                            {viewingProduct.allowedOrganizations.map((org, index) => {
+                              const orgName = typeof org === 'object' ? org.name : 'Organization';
+                              return (
+                                <Chip
+                                  key={index}
+                                  label={orgName}
+                                  size="small"
+                                  sx={{
+                                    backgroundColor: 'rgba(11, 120, 151, 0.1)',
+                                    color: '#0B7897',
+                                    fontWeight: 500,
+                                  }}
+                                />
+                              );
+                            })}
+                          </Box>
+                        </Grid>
+                      )}
+                      {viewingProduct.allowedInstitutes && viewingProduct.allowedInstitutes.length > 0 && (
+                        <Grid item xs={12}>
+                          <Typography variant="subtitle2" color="text.secondary">
+                            Allowed Institutes
+                          </Typography>
+                          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 1 }}>
+                            {viewingProduct.allowedInstitutes.map((inst, index) => {
+                              const instName = typeof inst === 'object' ? inst.name : 'Institute';
+                              return (
+                                <Chip
+                                  key={index}
+                                  label={instName}
+                                  size="small"
+                                  sx={{
+                                    backgroundColor: 'rgba(11, 120, 151, 0.1)',
+                                    color: '#0B7897',
+                                    fontWeight: 500,
+                                  }}
+                                />
+                              );
+                            })}
+                          </Box>
+                        </Grid>
+                      )}
+                    </>
+                  )}
+                  {((viewingProduct.level1 && viewingProduct.level1.length > 0) ||
+                    (viewingProduct.level2 && viewingProduct.level2.length > 0) ||
+                    (viewingProduct.level3 && viewingProduct.level3.length > 0)) && (
+                    <Grid item xs={12}>
+                      <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
+                        Cards by Level
+                      </Typography>
+                      {viewingProduct.level1 && viewingProduct.level1.length > 0 && (
+                        <Box sx={{ mb: 2 }}>
+                          <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
+                            Level 1: {viewingProduct.level1.length} card{viewingProduct.level1.length !== 1 ? 's' : ''}
+                          </Typography>
+                          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                            {viewingProduct.level1.map((card, index) => {
+                              const cardTitle = typeof card === 'object' ? (card.title || card.name) : 'Card';
+                              return (
+                                <Chip
+                                  key={index}
+                                  label={cardTitle}
+                                  size="small"
+                                  sx={{
+                                    backgroundColor: 'rgba(76, 175, 80, 0.1)',
+                                    color: '#4CAF50',
+                                    fontSize: '0.75rem',
+                                  }}
+                                />
+                              );
+                            })}
+                          </Box>
+                        </Box>
+                      )}
+                      {viewingProduct.level2 && viewingProduct.level2.length > 0 && (
+                        <Box sx={{ mb: 2 }}>
+                          <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
+                            Level 2: {viewingProduct.level2.length} card{viewingProduct.level2.length !== 1 ? 's' : ''}
+                          </Typography>
+                          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                            {viewingProduct.level2.map((card, index) => {
+                              const cardTitle = typeof card === 'object' ? (card.title || card.name) : 'Card';
+                              return (
+                                <Chip
+                                  key={index}
+                                  label={cardTitle}
+                                  size="small"
+                                  sx={{
+                                    backgroundColor: 'rgba(255, 152, 0, 0.1)',
+                                    color: '#FF9800',
+                                    fontSize: '0.75rem',
+                                  }}
+                                />
+                              );
+                            })}
+                          </Box>
+                        </Box>
+                      )}
+                      {viewingProduct.level3 && viewingProduct.level3.length > 0 && (
+                        <Box sx={{ mb: 2 }}>
+                          <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
+                            Level 3: {viewingProduct.level3.length} card{viewingProduct.level3.length !== 1 ? 's' : ''}
+                          </Typography>
+                          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                            {viewingProduct.level3.map((card, index) => {
+                              const cardTitle = typeof card === 'object' ? (card.title || card.name) : 'Card';
+                              return (
+                                <Chip
+                                  key={index}
+                                  label={cardTitle}
+                                  size="small"
+                                  sx={{
+                                    backgroundColor: 'rgba(156, 39, 176, 0.1)',
+                                    color: '#9C27B0',
+                                    fontSize: '0.75rem',
+                                  }}
+                                />
+                              );
+                            })}
+                          </Box>
+                        </Box>
+                      )}
+                    </Grid>
+                  )}
+                </Grid>
+              </Box>
+            )}
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={handleViewClose}>Close</Button>
           </DialogActions>
         </Dialog>
 
