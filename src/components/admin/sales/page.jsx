@@ -166,7 +166,20 @@ export default function Sales() {
       setError(null);
     } catch (err) {
       console.error('Error fetching sales data:', err);
-      setError(err.response?.data?.error || 'Failed to load sales data');
+      const errorMessage = err.response?.data?.error || 'Failed to load sales data';
+      // If error is "User not found", don't show error - just show empty state in table
+      if (errorMessage === 'User not found') {
+        setError(null);
+        if (tabValue === 0) {
+          setAllTransactions([]); // Set empty array to show "No transactions found"
+        } else if (tabValue === 1) {
+          setB2bB2eContracts([]); // Set empty array to show "No B2B/B2E contracts found"
+        } else if (tabValue === 2) {
+          setAllMemberships([]); // Set empty array to show "No memberships found"
+        }
+      } else {
+        setError(errorMessage);
+      }
     } finally {
       setLoading(false);
     }
