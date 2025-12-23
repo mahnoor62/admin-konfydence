@@ -832,7 +832,7 @@ const CATEGORY_OPTIONS = [
   { label: 'Auditors', value: 'auditors' },
   { label: 'NIS2', value: 'nis2' },
   { label: 'CoMaSi', value: 'comasi' },
-  { label: 'B2B sales', value: 'b2b-sales' },
+  // { label: 'B2B sales', value: 'b2b-sales' },
 ];
 
 function BlogContent() {
