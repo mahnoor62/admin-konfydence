@@ -775,6 +775,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import axios from 'axios';
+import RichTextEditor from '@/components/admin/RichTextEditor';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
 if (!API_BASE_URL) {
@@ -1920,17 +1921,18 @@ function ProductsContent() {
                   setFormData({ ...formData, name: e.target.value })
                 }
               />
-              <TextField
-                label="Description"
-                fullWidth
-                multiline
-                rows={3}
-                required
-                value={formData.description}
-                onChange={(e) =>
-                  setFormData({ ...formData, description: e.target.value })
-                }
-              />
+              <Box>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                  Description *
+                </Typography>
+                <RichTextEditor
+                  value={formData.description}
+                  onChange={(value) =>
+                    setFormData({ ...formData, description: value })
+                  }
+                  placeholder="Enter product description..."
+                />
+              </Box>
               <TextField
                 label="Price"
                 type="number"

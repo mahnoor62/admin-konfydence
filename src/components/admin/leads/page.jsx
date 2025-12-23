@@ -1,6 +1,7 @@
 'use client';
 export const dynamic = 'force-dynamic';
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/router';
 import {
   Box,
   Typography,
@@ -73,6 +74,7 @@ function getApiInstance() {
 }
 
 export default function Leads() {
+  const router = useRouter();
   const [leads, setLeads] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -91,8 +93,6 @@ export default function Leads() {
     primaryContact: {
       name: '',
       email: '',
-      phone: '',
-      jobTitle: '',
     },
   });
 
@@ -127,16 +127,9 @@ export default function Leads() {
     return () => clearTimeout(debounceTimer);
   }, [statusFilter, segmentFilter, searchQuery]);
 
-  const handleViewDetail = async (leadId) => {
-    try {
-      const api = getApiInstance();
-      const response = await api.get(`/leads/unified/${leadId}`);
-      setSelectedLead(response.data);
-      setDetailOpen(true);
-    } catch (err) {
-      console.error('Error fetching lead detail:', err);
-      setError(err.response?.data?.error || 'Failed to load lead details');
-    }
+  const handleViewDetail = (leadId) => {
+    // Navigate to detail page
+    router.push(`/leads/${leadId}`);
   };
 
   const handleStatusChange = async (leadId, newStatus) => {
@@ -243,8 +236,6 @@ export default function Leads() {
       primaryContact: {
         name: selectedLead.name,
         email: selectedLead.email,
-        phone: selectedLead.phone || '',
-        jobTitle: selectedLead.jobTitle || '',
       },
     });
     setConvertOpen(true);
@@ -307,8 +298,7 @@ export default function Leads() {
       return (
         lead.name?.toLowerCase().includes(query) ||
         lead.email?.toLowerCase().includes(query) ||
-        lead.organizationName?.toLowerCase().includes(query) ||
-        lead.phone?.toLowerCase().includes(query)
+        lead.organizationName?.toLowerCase().includes(query)
       );
     }
     return true;
@@ -573,7 +563,9 @@ export default function Leads() {
                 <TableRow 
                   key={lead._id} 
                   hover
+                  onClick={() => handleViewDetail(lead._id)}
                   sx={{
+                    cursor: 'pointer',
                     bgcolor: lead.status === 'hot' ? '#ffebee' : 'inherit',
                     '&:hover': {
                       bgcolor: lead.status === 'hot' ? '#ffcdd2' : 'action.hover',
@@ -590,26 +582,14 @@ export default function Leads() {
                           {lead.name}
                         </Typography>
                       </Box>
-                      {lead.jobTitle && (
-                        <Typography variant="caption" color="text.secondary">
-                          {lead.jobTitle}
-                        </Typography>
-                      )}
                     </Box>
                   </TableCell>
                   <TableCell>
-                    <Box>
-                      <Typography variant="body2">{lead.email}</Typography>
-                      {lead.phone && (
-                        <Typography variant="caption" color="text.secondary">
-                          {lead.phone}
-                        </Typography>
-                      )}
-                    </Box>
+                    <Typography variant="body2">{lead.email}</Typography>
                   </TableCell>
                   <TableCell>{lead.organizationName || 'N/A'}</TableCell>
                   <TableCell>
-                    <Chip
+                    <Chip 
                       label={lead.segment}
                       color={lead.segment === 'B2B' ? 'primary' : lead.segment === 'B2E' ? 'info' : 'default'}
                       size="small"
@@ -717,25 +697,9 @@ export default function Leads() {
               <Grid item xs={12} sm={6}>
                 <TextField
                   fullWidth
-                  label="Phone"
-                  value={selectedLead.phone || ''}
-                  onChange={(e) => handleUpdateLead('phone', e.target.value)}
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
                   label="Organization"
                   value={selectedLead.organizationName || ''}
                   onChange={(e) => handleUpdateLead('organizationName', e.target.value)}
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  label="Job Title"
-                  value={selectedLead.jobTitle || ''}
-                  onChange={(e) => handleUpdateLead('jobTitle', e.target.value)}
                 />
               </Grid>
               <Grid item xs={12} sm={6}>
@@ -1032,32 +996,6 @@ export default function Leads() {
                   setConvertForm({
                     ...convertForm,
                     primaryContact: { ...convertForm.primaryContact, email: e.target.value },
-                  })
-                }
-              />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label="Contact Phone"
-                value={convertForm.primaryContact.phone}
-                onChange={(e) =>
-                  setConvertForm({
-                    ...convertForm,
-                    primaryContact: { ...convertForm.primaryContact, phone: e.target.value },
-                  })
-                }
-              />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label="Job Title"
-                value={convertForm.primaryContact.jobTitle}
-                onChange={(e) =>
-                  setConvertForm({
-                    ...convertForm,
-                    primaryContact: { ...convertForm.primaryContact, jobTitle: e.target.value },
                   })
                 }
               />

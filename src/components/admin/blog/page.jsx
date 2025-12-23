@@ -773,6 +773,7 @@ import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
 import axios from 'axios';
+import RichTextEditor from '@/components/admin/RichTextEditor';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
 if (!API_BASE_URL) {
@@ -826,6 +827,12 @@ const CATEGORY_OPTIONS = [
   { label: 'For schools', value: 'for-schools' },
   { label: 'News', value: 'news' },
   { label: 'How-to', value: 'how-to' },
+  { label: 'Kids program', value: 'kids-program' },
+  { label: 'Charity model', value: 'charity-model' },
+  { label: 'Auditors', value: 'auditors' },
+  { label: 'NIS2', value: 'nis2' },
+  { label: 'CoMaSi', value: 'comasi' },
+  { label: 'B2B sales', value: 'b2b-sales' },
 ];
 
 function BlogContent() {
@@ -840,7 +847,6 @@ function BlogContent() {
 
   const [formData, setFormData] = useState({
     title: '',
-    slug: '',
     excerpt: '',
     content: '',
     featuredImage: '',
@@ -922,7 +928,6 @@ function BlogContent() {
       setEditing(post);
       setFormData({
         title: post.title,
-        slug: post.slug,
         excerpt: post.excerpt,
         content: post.content,
         featuredImage: post.featuredImage || '',
@@ -933,7 +938,6 @@ function BlogContent() {
       setEditing(null);
       setFormData({
         title: '',
-        slug: '',
         excerpt: '',
         content: '',
         featuredImage: '',
@@ -957,14 +961,6 @@ function BlogContent() {
         setSnackbar({
           open: true,
           message: 'Post title is required',
-          severity: 'error',
-        });
-        return;
-      }
-      if (!formData.slug.trim()) {
-        setSnackbar({
-          open: true,
-          message: 'Post slug is required',
           severity: 'error',
         });
         return;
@@ -1314,15 +1310,6 @@ function BlogContent() {
               }
             />
             <TextField
-              label="Slug"
-              fullWidth
-              required
-              value={formData.slug}
-              onChange={(e) =>
-                setFormData({ ...formData, slug: e.target.value })
-              }
-            />
-            <TextField
               label="Excerpt"
               fullWidth
               multiline
@@ -1333,17 +1320,18 @@ function BlogContent() {
                 setFormData({ ...formData, excerpt: e.target.value })
               }
             />
-            <TextField
-              label="Content (HTML/Markdown)"
-              fullWidth
-              multiline
-              rows={10}
-              required
-              value={formData.content}
-              onChange={(e) =>
-                setFormData({ ...formData, content: e.target.value })
-              }
-            />
+            <Box>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                Content (HTML/Markdown) *
+              </Typography>
+              <RichTextEditor
+                value={formData.content}
+                onChange={(value) =>
+                  setFormData({ ...formData, content: value })
+                }
+                placeholder="Enter blog post content..."
+              />
+            </Box>
 
             {/* Image Upload */}
             <Box

@@ -9,6 +9,7 @@ const slate = '#4F6272';
 
 export const theme = createTheme({
   palette: {
+    mode: 'light',
     primary: {
       main: teal,
       light: '#33BABA',
