@@ -825,7 +825,7 @@ const CATEGORY_OPTIONS = [
   { label: 'For families', value: 'for-families' },
   { label: 'For companies', value: 'for-companies' },
   { label: 'For schools', value: 'for-schools' },
-  { label: 'News', value: 'news' },
+  // { label: 'News', value: 'news' },
   { label: 'How-to', value: 'how-to' },
   { label: 'Kids program', value: 'kids-program' },
   { label: 'Charity model', value: 'charity-model' },
