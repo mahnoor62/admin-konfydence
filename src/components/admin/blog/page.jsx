@@ -827,11 +827,11 @@ const CATEGORY_OPTIONS = [
   { label: 'For schools', value: 'for-schools' },
   // { label: 'News', value: 'news' },
   { label: 'How-to', value: 'how-to' },
-  { label: 'Kids program', value: 'kids-program' },
-  { label: 'Charity model', value: 'charity-model' },
+  // { label: 'Kids program', value: 'kids-program' },
+  // { label: 'Charity model', value: 'charity-model' },
   { label: 'Auditors', value: 'auditors' },
-  { label: 'NIS2', value: 'nis2' },
-  { label: 'CoMaSi', value: 'comasi' },
+  // { label: 'NIS2', value: 'nis2' },
+  // { label: 'CoMaSi', value: 'comasi' },
   // { label: 'B2B sales', value: 'b2b-sales' },
 ];
 
