@@ -666,17 +666,19 @@ export default function CustomPackageRequests() {
                   </TableCell>
                   <TableCell>
                     <Typography variant="body2">{request.contactName}</Typography>
-                    <Typography variant="caption" color="text.secondary">
+                    <Typography variant="caption" color="text.secondary" display="block">
                       {request.contactEmail}
                     </Typography>
                     {request.contactPhone && (
                       <Typography variant="caption" color="text.secondary" display="block">
-                        {request.contactPhone}
+                        📞 {request.contactPhone}
                       </Typography>
                     )}
                   </TableCell>
                   <TableCell>
-                    {request.requestedModifications?.seatLimit || 'N/A'}
+                    {request.requestedModifications?.seatLimit !== undefined && request.requestedModifications?.seatLimit !== null 
+                      ? request.requestedModifications.seatLimit 
+                      : 'N/A'}
                   </TableCell>
                   <TableCell>
                     <Chip
@@ -778,46 +780,40 @@ export default function CustomPackageRequests() {
                     {selectedRequest.contactEmail}
                   </Typography>
                 </Grid>
-                {selectedRequest.contactPhone && (
-                  <Grid item xs={12} sm={6}>
-                    <Typography variant="subtitle2" color="text.secondary">
-                      Phone
-                    </Typography>
-                    <Typography variant="body1" sx={{ mb: 2 }}>
-                      {selectedRequest.contactPhone}
-                    </Typography>
-                  </Grid>
-                )}
-                {selectedRequest.requestedModifications?.seatLimit && (
-                  <Grid item xs={12} sm={6}>
-                    <Typography variant="subtitle2" color="text.secondary">
-                      Number of Seats
-                    </Typography>
-                    <Typography variant="body1" sx={{ mb: 2 }}>
-                      {selectedRequest.requestedModifications.seatLimit}
-                    </Typography>
-                  </Grid>
-                )}
-                {selectedRequest.requestedModifications?.customPricing?.notes && (
-                  <Grid item xs={12}>
-                    <Typography variant="subtitle2" color="text.secondary">
-                      Custom Pricing Requirements
-                    </Typography>
-                    <Typography variant="body1" sx={{ mb: 2 }}>
-                      {selectedRequest.requestedModifications.customPricing.notes}
-                    </Typography>
-                  </Grid>
-                )}
-                {selectedRequest.requestedModifications?.additionalNotes && (
-                  <Grid item xs={12}>
-                    <Typography variant="subtitle2" color="text.secondary">
-                      Additional Requirements
-                    </Typography>
-                    <Typography variant="body1" sx={{ mb: 2, whiteSpace: 'pre-wrap' }}>
-                      {selectedRequest.requestedModifications.additionalNotes}
-                    </Typography>
-                  </Grid>
-                )}
+                <Grid item xs={12} sm={6}>
+                  <Typography variant="subtitle2" color="text.secondary">
+                    Phone
+                  </Typography>
+                  <Typography variant="body1" sx={{ mb: 2 }}>
+                    {selectedRequest.contactPhone || 'Not provided'}
+                  </Typography>
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <Typography variant="subtitle2" color="text.secondary">
+                    Number of Seats/Users
+                  </Typography>
+                  <Typography variant="body1" sx={{ mb: 2 }}>
+                    {selectedRequest.requestedModifications?.seatLimit !== undefined && selectedRequest.requestedModifications?.seatLimit !== null
+                      ? selectedRequest.requestedModifications.seatLimit
+                      : 'Not specified'}
+                  </Typography>
+                </Grid>
+                <Grid item xs={12}>
+                  <Typography variant="subtitle2" color="text.secondary">
+                    Custom Pricing Requirements
+                  </Typography>
+                  <Typography variant="body1" sx={{ mb: 2 }}>
+                    {selectedRequest.requestedModifications?.customPricing?.notes || 'Not provided'}
+                  </Typography>
+                </Grid>
+                <Grid item xs={12}>
+                  <Typography variant="subtitle2" color="text.secondary">
+                    Additional Requirements
+                  </Typography>
+                  <Typography variant="body1" sx={{ mb: 2, whiteSpace: 'pre-wrap' }}>
+                    {selectedRequest.requestedModifications?.additionalNotes || 'Not provided'}
+                  </Typography>
+                </Grid>
                 <Grid item xs={12}>
                   <Typography variant="subtitle2" color="text.secondary">
                     Status
