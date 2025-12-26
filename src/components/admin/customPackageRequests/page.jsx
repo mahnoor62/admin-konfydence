@@ -596,12 +596,26 @@ export default function CustomPackageRequests() {
 
   return (
     <Box>
-      <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={3} sx={{ flexWrap: 'wrap', gap: 2 }}>
+      <Box 
+        display="flex" 
+        flexDirection={{ xs: 'column', md: 'row' }}
+        justifyContent="space-between" 
+        alignItems={{ xs: 'flex-start', md: 'flex-start' }}
+        mb={3} 
+        gap={2}
+      >
         <Typography variant="h4">Custom Package Requests</Typography>
-        <FormControl size="small" sx={{ minWidth: 180, mt: 0.5 }}>
+        <FormControl 
+          size="small" 
+          sx={{ 
+            minWidth: { xs: '100%', md: 180 }, 
+            mt: { xs: 0, md: 0.5 },
+            width: { xs: '100%', md: 'auto' }
+          }}
+        >
           <InputLabel id="status-filter-label" sx={{ 
             backgroundColor: 'white',
-            mt:.5,
+            mt: 0.5,
             '&.MuiInputLabel-shrink': {
               transform: 'translate(14px, -9px) scale(0.75)'
             }

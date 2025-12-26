@@ -435,23 +435,36 @@ export default function LeadDetail() {
       )}
       
       {/* Header */}
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-        <Box display="flex" alignItems="center" gap={2}>
+      <Box 
+        display="flex" 
+        flexDirection={{ xs: 'column', md: 'row' }}
+        justifyContent="space-between" 
+        alignItems={{ xs: 'flex-start', md: 'center' }}
+        gap={{ xs: 2, md: 0 }}
+        mb={3}
+      >
+        <Box display="flex" alignItems="center" gap={2} width={{ xs: '100%', md: 'auto' }}>
           <IconButton onClick={() => router.push('/leads')}>
             <ArrowBack />
           </IconButton>
-          <Box>
+          <Box flex={1}>
             <Typography variant="h4">{lead.name}</Typography>
             <Typography variant="body2" color="text.secondary">
               {lead.email} {lead.organizationName && `• ${lead.organizationName}`}
             </Typography>
           </Box>
         </Box>
-        <Box display="flex" gap={2}>
+        <Box 
+          display="flex" 
+          gap={2} 
+          width={{ xs: '100%', md: 'auto' }}
+          flexDirection={{ xs: 'column', md: 'row' }}
+        >
           <Button
             startIcon={<Download />}
             variant="outlined"
             onClick={handleExport}
+            fullWidth={{ xs: true, md: false }}
           >
             Export
           </Button>
@@ -460,6 +473,7 @@ export default function LeadDetail() {
             variant="contained"
             color={getStatusColor(lead.status)}
             onClick={() => setEditStatusOpen(true)}
+            fullWidth={{ xs: true, md: false }}
           >
             {lead.status?.toUpperCase()}
           </Button>
@@ -468,12 +482,50 @@ export default function LeadDetail() {
 
       {/* Tabs */}
       <Paper sx={{ mb: 3 }}>
-        <Tabs value={activeTab} onChange={(e, v) => setActiveTab(v)}>
-          <Tab label="Overview" />
-          <Tab label="Timeline" />
-          <Tab label="Notes" />
-          <Tab label="Engagements" />
-          <Tab label="Compliance" />
+        <Tabs 
+          value={activeTab} 
+          onChange={(e, v) => setActiveTab(v)}
+          sx={{ 
+            '& .MuiTabs-flexContainer': {
+              flexWrap: { xs: 'wrap', md: 'nowrap' }
+            }
+          }}
+        >
+          <Tab 
+            label="Overview" 
+            sx={{ 
+              minWidth: { xs: 'auto', md: 72 },
+              flex: { xs: 'none', md: '0 1 auto' }
+            }} 
+          />
+          <Tab 
+            label="Timeline" 
+            sx={{ 
+              minWidth: { xs: 'auto', md: 72 },
+              flex: { xs: 'none', md: '0 1 auto' }
+            }} 
+          />
+          <Tab 
+            label="Notes" 
+            sx={{ 
+              minWidth: { xs: 'auto', md: 72 },
+              flex: { xs: 'none', md: '0 1 auto' }
+            }} 
+          />
+          <Tab 
+            label="Engagements" 
+            sx={{ 
+              minWidth: { xs: 'auto', md: 72 },
+              flex: { xs: 'none', md: '0 1 auto' }
+            }} 
+          />
+          <Tab 
+            label="Compliance" 
+            sx={{ 
+              minWidth: { xs: 'auto', md: 72 },
+              flex: { xs: 'none', md: '0 1 auto' }
+            }} 
+          />
         </Tabs>
       </Paper>
 
@@ -489,17 +541,17 @@ export default function LeadDetail() {
                 </Typography>
                 <Divider sx={{ mb: 2 }} />
                 <Grid container spacing={2}>
-                  <Grid item xs={6}>
+                  <Grid item xs={12} md={6}>
                     <Typography variant="caption" color="text.secondary">
                       Name
                     </Typography>
                     <Typography variant="body1">{lead.name}</Typography>
                   </Grid>
-                  <Grid item xs={6}>
+                  <Grid item xs={12} md={6}>
                     <Typography variant="caption" color="text.secondary">
                       Email
                     </Typography>
-                    <Typography variant="body1">{lead.email}</Typography>
+                    <Typography variant="body1" sx={{ wordBreak: 'break-word' }}>{lead.email}</Typography>
                   </Grid>
                   <Grid item xs={6}>
                     <Typography variant="caption" color="text.secondary">
@@ -657,12 +709,20 @@ export default function LeadDetail() {
       {activeTab === 2 && (
         <Card>
           <CardContent>
-            <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+            <Box 
+              display="flex" 
+              flexDirection={{ xs: 'column', md: 'row' }}
+              justifyContent="space-between" 
+              alignItems={{ xs: 'flex-start', md: 'center' }}
+              gap={{ xs: 2, md: 0 }}
+              mb={2}
+            >
               <Typography variant="h6">Notes & Internal Discussion</Typography>
               <Button
                 startIcon={<Note />}
                 variant="contained"
                 onClick={() => setNoteDialogOpen(true)}
+                fullWidth={{ xs: true, md: false }}
               >
                 Add Note
               </Button>
@@ -703,12 +763,20 @@ export default function LeadDetail() {
       {activeTab === 3 && (
         <Card>
           <CardContent>
-            <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+            <Box 
+              display="flex" 
+              flexDirection={{ xs: 'column', md: 'row' }}
+              justifyContent="space-between" 
+              alignItems={{ xs: 'flex-start', md: 'center' }}
+              gap={{ xs: 2, md: 0 }}
+              mb={2}
+            >
               <Typography variant="h6">Engagement History</Typography>
               <Button
                 startIcon={<Phone />}
                 variant="contained"
                 onClick={() => setEngagementDialogOpen(true)}
+                fullWidth={{ xs: true, md: false }}
               >
                 Log Engagement
               </Button>

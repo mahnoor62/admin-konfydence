@@ -1635,14 +1635,31 @@ function ProductsContent() {
         <Box
           sx={{
             display: 'flex',
+            flexDirection: { xs: 'column', md: 'row' },
             justifyContent: 'space-between',
-            alignItems: 'center',
+            alignItems: { xs: 'flex-start', md: 'center' },
+            gap: { xs: 2, md: 0 },
             mb: 3,
           }}
         >
           <Typography variant="h4">Products</Typography>
-          <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
-            <FormControl size="small" sx={{ minWidth: 150, mt: 1 }}>
+          <Box 
+            sx={{ 
+              display: 'flex', 
+              gap: 2, 
+              alignItems: 'center',
+              flexDirection: { xs: 'column', sm: 'row' },
+              width: { xs: '100%', md: 'auto' }
+            }}
+          >
+            <FormControl 
+              size="small" 
+              sx={{ 
+                minWidth: { xs: '100%', sm: 150 }, 
+                mt: { xs: 0, sm: 1 },
+                width: { xs: '100%', sm: 'auto' }
+              }}
+            >
               <InputLabel 
                 sx={{ 
                   zIndex: 1,
@@ -1685,6 +1702,7 @@ function ProductsContent() {
                   boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
                 },
                 transition: 'all 0.3s ease',
+                width: { xs: '100%', sm: 'auto' }
               }}
             >
               Add Product

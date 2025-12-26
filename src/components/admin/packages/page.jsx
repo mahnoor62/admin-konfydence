@@ -793,21 +793,24 @@ export default function Packages() {
         }}>
           <Typography variant="h4">Packages</Typography>
           {(mainTab === 0 || (mainTab === 1 && b2bTab === 0)) && (
-            <Box display="flex" gap={2} alignItems="center" sx={{ 
-              flexWrap: 'wrap',
-              flexDirection: { xs: 'column', sm: 'row' },
-              alignItems: { xs: 'flex-start', sm: 'center' },
-              justifyContent: { xs: 'flex-start', sm: 'flex-end' },
-              '& > *': {
-                width: { xs: 'auto', sm: 'auto' }
-              }
-            }}>
+            <Box 
+              display="flex" 
+              gap={2} 
+              alignItems="center" 
+              width={{ xs: '100%', sm: 'auto' }}
+              sx={{ 
+                flexDirection: { xs: 'column', sm: 'row' },
+                alignItems: { xs: 'flex-start', sm: 'center' },
+                justifyContent: { xs: 'flex-start', sm: 'flex-end' }
+              }}
+            >
             <FormControl 
               size="small" 
               sx={{ 
-                minWidth: 150,
+                minWidth: { xs: '100%', sm: 150 },
+                width: { xs: '100%', sm: 'auto' },
                 overflow: 'visible',
-                mt: 1,
+                mt: { xs: 0, sm: 1 },
                 '& .MuiInputBase-root': {
                   overflow: 'visible',
                 }

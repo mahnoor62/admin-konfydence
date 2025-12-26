@@ -242,12 +242,19 @@ export default function Sales() {
 
   return (
     <Box>
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+      <Box 
+        display="flex" 
+        flexDirection={{ xs: 'column', md: 'row' }}
+        justifyContent="space-between" 
+        alignItems={{ xs: 'flex-start', md: 'center' }}
+        gap={{ xs: 2, md: 0 }}
+        mb={2}
+      >
         <Typography variant="h4">
           Sales & Memberships
         </Typography>
         {tabValue === 0 && (
-          <FormControl size="small" sx={{ minWidth: 180 }}>
+          <FormControl size="small" sx={{ minWidth: { xs: '100%', md: 180 } }}>
             <InputLabel id="type-filter-label" sx={{ 
               px: 1,
               mt: 0.5,
@@ -279,7 +286,7 @@ export default function Sales() {
           </FormControl>
         )}
         {tabValue === 2 && (
-          <FormControl size="small" sx={{ minWidth: 180 }}>
+          <FormControl size="small" sx={{ minWidth: { xs: '100%', md: 180 } }}>
             <InputLabel id="membership-status-filter-label" sx={{ 
               px: 1,
               mt: 0.5,
@@ -320,10 +327,37 @@ export default function Sales() {
         </Alert>
       )}
 
-      <Tabs value={tabValue} onChange={(e, newValue) => setTabValue(newValue)} sx={{ mb: 3 }}>
-        <Tab label="Transactions" />
-        <Tab label="B2B/B2E Contracts" />
-        <Tab label="Memberships" />
+      <Tabs 
+        value={tabValue} 
+        onChange={(e, newValue) => setTabValue(newValue)} 
+        sx={{ 
+          mb: 3,
+          '& .MuiTabs-flexContainer': {
+            flexWrap: { xs: 'wrap', md: 'nowrap' }
+          }
+        }}
+      >
+        <Tab 
+          label="Transactions" 
+          sx={{ 
+            minWidth: { xs: 'auto', md: 72 },
+            flex: { xs: 'none', md: '0 1 auto' }
+          }} 
+        />
+        <Tab 
+          label="B2B/B2E Contracts" 
+          sx={{ 
+            minWidth: { xs: 'auto', md: 72 },
+            flex: { xs: 'none', md: '0 1 auto' }
+          }} 
+        />
+        <Tab 
+          label="Memberships" 
+          sx={{ 
+            minWidth: { xs: 'auto', md: 72 },
+            flex: { xs: 'none', md: '0 1 auto' }
+          }} 
+        />
       </Tabs>
 
       {tabValue === 0 && (

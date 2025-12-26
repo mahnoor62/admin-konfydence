@@ -847,8 +847,10 @@ function PartnersContent() {
       <Box
         sx={{
           display: 'flex',
+          flexDirection: { xs: 'column', md: 'row' },
           justifyContent: 'space-between',
-          alignItems: 'center',
+          alignItems: { xs: 'flex-start', md: 'center' },
+          gap: { xs: 2, md: 0 },
           mb: 3,
         }}
       >
@@ -864,6 +866,7 @@ function PartnersContent() {
               boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
             },
             transition: 'all 0.3s ease',
+            width: { xs: '100%', md: 'auto' }
           }}
         >
           Add Partner Logo

@@ -394,14 +394,32 @@ export default function Organizations() {
 
   return (
     <Box>
-      <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={3} sx={{ flexWrap: 'wrap', gap: 2 }}>
+      <Box 
+        display="flex" 
+        flexDirection={{ xs: 'column', md: 'row' }}
+        justifyContent="space-between" 
+        alignItems={{ xs: 'flex-start', md: 'flex-start' }}
+        mb={3} 
+        gap={2}
+      >
         <Typography variant="h4">Organizations</Typography>
-        <Box display="flex" gap={2} alignItems="center" sx={{ flexWrap: 'wrap' }}>
-          <FormControl size="small" sx={{ minWidth: 180 }}>
+        <Box 
+          display="flex" 
+          flexDirection={{ xs: 'column', sm: 'row' }}
+          gap={2} 
+          alignItems="center" 
+          width={{ xs: '100%', md: 'auto' }}
+        >
+          <FormControl 
+            size="small" 
+            sx={{ 
+              minWidth: { xs: '100%', sm: 180 },
+              width: { xs: '100%', sm: 'auto' }
+            }}
+          >
             <InputLabel id="status-filter-label" sx={{ 
-              // backgroundColor: 'white',
               px: 1,
-              mt:.5,
+              mt: 0.5,
               '&.MuiInputLabel-shrink': {
                 transform: 'translate(14px, -9px) scale(0.75)'
               }
@@ -428,7 +446,12 @@ export default function Organizations() {
               <MenuItem value="expired">Expired</MenuItem>
             </Select>
           </FormControl>
-          <Button variant="contained" startIcon={<AddIcon />} onClick={handleOpenCreate}>
+          <Button 
+            variant="contained" 
+            startIcon={<AddIcon />} 
+            onClick={handleOpenCreate}
+            fullWidth={{ xs: true, sm: false }}
+          >
             Create Organization
           </Button>
         </Box>
