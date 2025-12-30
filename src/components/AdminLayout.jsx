@@ -37,6 +37,7 @@ import SettingsIcon from '@mui/icons-material/Settings';
 import DescriptionIcon from '@mui/icons-material/Description';
 import InventoryIcon from '@mui/icons-material/Inventory';
 import RequestQuoteIcon from '@mui/icons-material/RequestQuote';
+import CampaignIcon from '@mui/icons-material/Campaign';
 
 const drawerWidth = 240;
 
@@ -51,6 +52,7 @@ const menuItems = [
   { label: 'Sales & Memberships', href: '/sales', icon: ShoppingCartIcon, permission: 'transactions' },
   { label: 'Trials', href: '/demos', icon: PlayArrowIcon, permission: 'demos' },
   { label: 'Leads', href: '/leads', icon: ContactMailIcon, permission: 'leads' },
+  { label: 'Newsletter', href: '/newsletter', icon: CampaignIcon, permission: '*' },
   { label: 'Settings', href: '/settings', icon: SettingsIcon, permission: '*' },
   { label: 'Products', href: '/products', icon: ShoppingBagIcon, permission: '*' },
   { label: 'Blog Posts', href: '/blog', icon: ArticleIcon, permission: '*' },
@@ -138,13 +140,23 @@ export default function AdminLayout({ children }) {
 
   const drawer = (
     <Box sx={{ height: '100%', background: 'linear-gradient(185deg, #041519 0%, #042B32 70%)', color: 'white' }}>
-      <Toolbar sx={{ px: 3 }}>
+      <Toolbar sx={{ px: 3, display: 'flex', alignItems: 'center', gap: 1.5 }}>
+        <Box
+          component="img"
+          src="/logo.png"
+          alt="Konfydence Logo"
+          sx={{
+            width: 40,
+            height: 40,
+            objectFit: 'contain',
+          }}
+        />
         <Typography variant="h6" noWrap component="div" sx={{ fontWeight: 700, letterSpacing: '0.04em' }}>
           Konfydence
         </Typography>
       </Toolbar>
       <Divider sx={{ borderColor: 'rgba(255,255,255,0.15)' }} />
-      <List sx={{ mt: 2 }}>
+      <List sx={{ mt: 1, py: 0.5 }}>
         {menuItems.map((item) => {
           const active = pathname === item.href;
           // Basic permission check - can be enhanced with actual RBAC
@@ -155,7 +167,8 @@ export default function AdminLayout({ children }) {
                 selected={active}
                 onClick={() => router.push(item.href)}
                 sx={{
-                  my: 0.5,
+                  my: 0.25,
+                  py: 0.75,
                   borderRadius: 2,
                   color: active ? '#FFFFFF' : 'rgba(255,255,255,0.75)',
                   backgroundColor: active ? 'rgba(255,255,255,0.1)' : 'transparent',
@@ -164,10 +177,16 @@ export default function AdminLayout({ children }) {
                   },
                 }}
               >
-                <ListItemIcon sx={{ color: 'inherit', minWidth: 36 }}>
-                  <item.icon />
+                <ListItemIcon sx={{ color: 'inherit', minWidth: 32 }}>
+                  <item.icon fontSize="small" />
                 </ListItemIcon>
-                <ListItemText primary={item.label} />
+                <ListItemText 
+                  primary={item.label}
+                  primaryTypographyProps={{
+                    fontSize: '0.875rem',
+                    fontWeight: active ? 500 : 400,
+                  }}
+                />
               </ListItemButton>
             </ListItem>
           );

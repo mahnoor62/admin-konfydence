@@ -794,40 +794,40 @@ export default function CustomPackageRequests() {
                     {selectedRequest.contactEmail}
                   </Typography>
                 </Grid>
-                <Grid item xs={12} sm={6}>
-                  <Typography variant="subtitle2" color="text.secondary">
-                    Phone
-                  </Typography>
-                  <Typography variant="body1" sx={{ mb: 2 }}>
+                  <Grid item xs={12} sm={6}>
+                    <Typography variant="subtitle2" color="text.secondary">
+                      Phone
+                    </Typography>
+                    <Typography variant="body1" sx={{ mb: 2 }}>
                     {selectedRequest.contactPhone || 'Not provided'}
-                  </Typography>
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                  <Typography variant="subtitle2" color="text.secondary">
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <Typography variant="subtitle2" color="text.secondary">
                     Number of Seats/Users
-                  </Typography>
-                  <Typography variant="body1" sx={{ mb: 2 }}>
+                    </Typography>
+                    <Typography variant="body1" sx={{ mb: 2 }}>
                     {selectedRequest.requestedModifications?.seatLimit !== undefined && selectedRequest.requestedModifications?.seatLimit !== null
                       ? selectedRequest.requestedModifications.seatLimit
                       : 'Not specified'}
-                  </Typography>
-                </Grid>
-                <Grid item xs={12}>
-                  <Typography variant="subtitle2" color="text.secondary">
-                    Custom Pricing Requirements
-                  </Typography>
-                  <Typography variant="body1" sx={{ mb: 2 }}>
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={12}>
+                    <Typography variant="subtitle2" color="text.secondary">
+                      Custom Pricing Requirements
+                    </Typography>
+                    <Typography variant="body1" sx={{ mb: 2 }}>
                     {selectedRequest.requestedModifications?.customPricing?.notes || 'Not provided'}
-                  </Typography>
-                </Grid>
-                <Grid item xs={12}>
-                  <Typography variant="subtitle2" color="text.secondary">
-                    Additional Requirements
-                  </Typography>
-                  <Typography variant="body1" sx={{ mb: 2, whiteSpace: 'pre-wrap' }}>
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={12}>
+                    <Typography variant="subtitle2" color="text.secondary">
+                      Additional Requirements
+                    </Typography>
+                    <Typography variant="body1" sx={{ mb: 2, whiteSpace: 'pre-wrap' }}>
                     {selectedRequest.requestedModifications?.additionalNotes || 'Not provided'}
-                  </Typography>
-                </Grid>
+                    </Typography>
+                  </Grid>
                 <Grid item xs={12}>
                   <Typography variant="subtitle2" color="text.secondary">
                     Status

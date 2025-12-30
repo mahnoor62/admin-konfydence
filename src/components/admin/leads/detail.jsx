@@ -464,7 +464,7 @@ export default function LeadDetail() {
             startIcon={<Download />}
             variant="outlined"
             onClick={handleExport}
-            fullWidth={{ xs: true, md: false }}
+            sx={{ width: { xs: '100%', md: 'auto' } }}
           >
             Export
           </Button>
@@ -473,7 +473,7 @@ export default function LeadDetail() {
             variant="contained"
             color={getStatusColor(lead.status)}
             onClick={() => setEditStatusOpen(true)}
-            fullWidth={{ xs: true, md: false }}
+            sx={{ width: { xs: '100%', md: 'auto' } }}
           >
             {lead.status?.toUpperCase()}
           </Button>
@@ -585,6 +585,36 @@ export default function LeadDetail() {
                       {new Date(lead.createdAt).toLocaleDateString()}
                     </Typography>
                   </Grid>
+                  {lead.source === 'b2e_form' && lead.studentStaffSize && (
+                    <Grid item xs={12}>
+                      <Typography variant="caption" color="text.secondary">
+                        Student/Staff Size
+                      </Typography>
+                      <Typography variant="body1">
+                        {lead.studentStaffSize}
+                      </Typography>
+                    </Grid>
+                  )}
+                  {lead.source === 'b2b_form' && lead.teamSize && (
+                    <Grid item xs={12}>
+                      <Typography variant="caption" color="text.secondary">
+                        Team Size
+                      </Typography>
+                      <Typography variant="body1">
+                        {lead.teamSize}
+                      </Typography>
+                    </Grid>
+                  )}
+                  {lead.message && (
+                    <Grid item xs={12}>
+                      <Typography variant="caption" color="text.secondary">
+                        Message
+                      </Typography>
+                      <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                        {lead.message}
+                      </Typography>
+                    </Grid>
+                  )}
                 </Grid>
               </CardContent>
             </Card>
@@ -718,14 +748,16 @@ export default function LeadDetail() {
               mb={2}
             >
               <Typography variant="h6">Notes & Internal Discussion</Typography>
-              <Button
-                startIcon={<Note />}
-                variant="contained"
-                onClick={() => setNoteDialogOpen(true)}
-                fullWidth={{ xs: true, md: false }}
-              >
-                Add Note
-              </Button>
+              <Box sx={{ width: { xs: '100%', md: 'auto' } }}>
+                <Button
+                  startIcon={<Note />}
+                  variant="contained"
+                  onClick={() => setNoteDialogOpen(true)}
+                  sx={{ width: { xs: '100%', md: 'auto' } }}
+                >
+                  Add Note
+                </Button>
+              </Box>
             </Box>
             <Divider sx={{ mb: 2 }} />
             <List>
@@ -772,14 +804,16 @@ export default function LeadDetail() {
               mb={2}
             >
               <Typography variant="h6">Engagement History</Typography>
-              <Button
-                startIcon={<Phone />}
-                variant="contained"
-                onClick={() => setEngagementDialogOpen(true)}
-                fullWidth={{ xs: true, md: false }}
-              >
-                Log Engagement
-              </Button>
+              <Box sx={{ width: { xs: '100%', md: 'auto' } }}>
+                <Button
+                  startIcon={<Phone />}
+                  variant="contained"
+                  onClick={() => setEngagementDialogOpen(true)}
+                  sx={{ width: { xs: '100%', md: 'auto' } }}
+                >
+                  Log Engagement
+                </Button>
+              </Box>
             </Box>
             <Divider sx={{ mb: 2 }} />
             <List>
