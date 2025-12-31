@@ -52,7 +52,7 @@ const menuItems = [
   { label: 'Sales & Memberships', href: '/sales', icon: ShoppingCartIcon, permission: 'transactions' },
   { label: 'Trials', href: '/demos', icon: PlayArrowIcon, permission: 'demos' },
   { label: 'Leads', href: '/leads', icon: ContactMailIcon, permission: 'leads' },
-  { label: 'Newsletter', href: '/newsletter', icon: CampaignIcon, permission: '*' },
+  { label: 'Subscribers', href: '/subscribers', icon: CampaignIcon, permission: '*' },
   { label: 'Settings', href: '/settings', icon: SettingsIcon, permission: '*' },
   { label: 'Products', href: '/products', icon: ShoppingBagIcon, permission: '*' },
   { label: 'Blog Posts', href: '/blog', icon: ArticleIcon, permission: '*' },
