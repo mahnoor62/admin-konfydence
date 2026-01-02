@@ -25,6 +25,8 @@ import {
   Grid,
   Divider,
   Snackbar,
+  FormControlLabel,
+  Switch,
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -78,6 +80,7 @@ const createInitialFormData = () => ({
   category: '',
   visibility: 'public',
   targetAudiences: [],
+  isDemo: false,
   tags: [],
   question: createInitialQuestion() // Single question object
 });
@@ -193,6 +196,7 @@ export default function Cards() {
         category: card.category || '',
         visibility: card.visibility || 'public',
         targetAudiences: card.targetAudiences || [],
+        isDemo: card.isDemo || false,
         tags: card.tags || [],
         question: question
       });
@@ -250,6 +254,7 @@ export default function Cards() {
         category: latestFormData.category || '',
         visibility: latestFormData.visibility || 'public',
         targetAudiences: latestFormData.targetAudiences || [],
+        isDemo: latestFormData.isDemo || false,
         tags: latestFormData.tags || [],
         question: question
       };

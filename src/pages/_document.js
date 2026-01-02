@@ -6,6 +6,9 @@ export default function Document() {
       <Head>
         {/* <title>Konfydence Admin Panel</title> */}
         <meta name="description" content="Admin panel for Konfydence" />
+        <link rel="icon" type="image/png" href="/navbar-logo.png" />
+        <link rel="shortcut icon" type="image/png" href="/navbar-logo.png" />
+        <link rel="apple-touch-icon" type="image/png" href="/navbar-logo.png" />
       </Head>
       <body>
         <Main />
