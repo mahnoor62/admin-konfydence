@@ -426,7 +426,7 @@ export default function Sales() {
                         {userDisplay}
                       </TableCell>
                       <TableCell>
-                        {tx.packageId?.name || tx.customPackageId?.name || 'N/A'}
+                        {tx.packageId?.name || tx.customPackageId?.name || (tx.packageType ? tx.packageType.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ') : 'N/A')}
                       </TableCell>
                       <TableCell>{tx.type}</TableCell>
                       <TableCell>{formatCurrency(tx.amount, tx.currency)}</TableCell>
