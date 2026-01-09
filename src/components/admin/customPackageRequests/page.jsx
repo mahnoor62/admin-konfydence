@@ -87,7 +87,7 @@ export default function CustomPackageRequests() {
     organizationId: '',
     schoolId: '',
     entityType: '', // 'organization' or 'institute'
-    contractPricing: { amount: '', currency: 'EUR', billingType: 'one_time' },
+    contractPricing: { amount: '', currency: 'USD', billingType: 'one_time' },
     seatLimit: '',
     contract: { startDate: '' },
     expiryTime: null,
@@ -257,7 +257,7 @@ export default function CustomPackageRequests() {
       entityType: entityType,
       contractPricing: { 
         amount: request.requestedModifications?.customPricing?.amount || '', 
-        currency: request.requestedModifications?.customPricing?.currency || 'EUR', 
+        currency: request.requestedModifications?.customPricing?.currency || 'USD', 
         billingType: request.requestedModifications?.customPricing?.billingType || 'one_time' 
       },
       seatLimit: request.requestedModifications?.seatLimit || '',
@@ -444,7 +444,7 @@ export default function CustomPackageRequests() {
       if (createPackageData.contractPricing?.amount) {
         packageData.contractPricing = {
           amount: createPackageData.contractPricing.amount,
-          currency: createPackageData.contractPricing.currency || 'EUR',
+          currency: createPackageData.contractPricing.currency || 'USD',
           billingType: createPackageData.contractPricing.billingType || 'one_time'
         };
       }
@@ -491,7 +491,7 @@ export default function CustomPackageRequests() {
         organizationId: '',
         schoolId: '',
         entityType: '',
-        contractPricing: { amount: '', currency: 'EUR', billingType: 'one_time' },
+        contractPricing: { amount: '', currency: 'USD', billingType: 'one_time' },
         seatLimit: '',
         contract: { startDate: '' },
         expiryTime: null,
@@ -966,7 +966,7 @@ export default function CustomPackageRequests() {
           setError(null);
           setCreatePackageData({
             organizationId: '',
-            contractPricing: { amount: '', currency: 'EUR', billingType: 'one_time' },
+            contractPricing: { amount: '', currency: 'USD', billingType: 'one_time' },
             seatLimit: '',
             contract: { startDate: '' },
             expiryTime: null,
@@ -1128,7 +1128,7 @@ export default function CustomPackageRequests() {
                       }
                     })}
                     helperText={selectedRequest.requestedModifications?.customPricing?.amount 
-                      ? `Requested: €${selectedRequest.requestedModifications.customPricing.amount}` 
+                      ? `Requested: $${selectedRequest.requestedModifications.customPricing.amount}` 
                       : ''}
                   />
                 </Grid>
@@ -1203,7 +1203,7 @@ export default function CustomPackageRequests() {
                                 return (
                                   <Chip
                                     key={productIdStr}
-                                    label={`${product.name} (€${product.price})`}
+                                    label={`${product.name} ($${product.price})`}
                                     size="small"
                                     sx={{
                                       backgroundColor: 'rgba(11, 120, 151, 0.1)',
@@ -1251,7 +1251,7 @@ export default function CustomPackageRequests() {
                                     }}
                                   />
                                   <Typography variant="caption" color="text.secondary">
-                                    €{product.price}
+                                    ${product.price}
                                   </Typography>
                                 </Box>
                               </MenuItem>
@@ -1279,7 +1279,7 @@ export default function CustomPackageRequests() {
               organizationId: '',
               schoolId: '',
               entityType: '',
-              contractPricing: { amount: '', currency: 'EUR', billingType: 'one_time' },
+              contractPricing: { amount: '', currency: 'USD', billingType: 'one_time' },
               seatLimit: '',
               contract: { startDate: '' },
               expiryTime: null,

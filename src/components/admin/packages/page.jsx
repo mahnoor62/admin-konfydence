@@ -85,7 +85,7 @@ export default function Packages() {
     visibility: 'public',
     pricing: {
       amount: '',
-      currency: 'EUR',
+      currency: 'USD',
       billingType: 'one_time',
     },
     packageType: 'standard',
@@ -114,7 +114,7 @@ export default function Packages() {
   const [editCustomPackageData, setEditCustomPackageData] = useState({
     name: '',
     seatLimit: '',
-    contractPricing: { amount: '', currency: 'EUR', billingType: 'one_time' },
+    contractPricing: { amount: '', currency: 'USD', billingType: 'one_time' },
     contract: { startDate: '', endDate: '', status: 'active' },
     expiryTime: null,
     expiryTimeUnit: null,
@@ -138,7 +138,7 @@ export default function Packages() {
     organizationId: '',
     contractPricing: {
       amount: '',
-      currency: 'EUR',
+      currency: 'USD',
       billingType: 'one_time'
     },
     seatLimit: '',
@@ -234,7 +234,7 @@ export default function Packages() {
       seatLimit: pkg.seatLimit || '',
       contractPricing: {
         amount: pkg.contractPricing?.amount || '',
-        currency: pkg.contractPricing?.currency || 'EUR',
+        currency: pkg.contractPricing?.currency || 'USD',
         billingType: pkg.contractPricing?.billingType || 'one_time'
       },
       contract: {
@@ -341,20 +341,43 @@ export default function Packages() {
   const handleOpen = (pkg = null) => {
     if (pkg) {
       setEditing(pkg);
+      const packageType = pkg.packageType || pkg.type || pkg.category || 'standard';
+      
+      // Set default description if empty or missing, based on package type for B2C and B2B/B2E
+      let defaultDescription = pkg.description || '';
+      const isB2C = pkg.targetAudiences?.includes('B2C');
+      const isB2BOrB2E = pkg.targetAudiences?.includes('B2B') || pkg.targetAudiences?.includes('B2E');
+      
+      if (!defaultDescription) {
+        if (isB2C) {
+          if (packageType === 'digital') {
+            defaultDescription = 'Access to all digital cards and content. Unlimited digital access to online platform with regular content updates.';
+          } else if (packageType === 'digital_physical') {
+            defaultDescription = 'Everything in Digital Package plus physical card deck. Includes unique reference code included. Best value package with complete access.';
+          }
+        } else if (isB2BOrB2E) {
+          if (packageType === 'digital') {
+            defaultDescription = 'Digital package for organizations. Online access with unique codes for team members.';
+          } else if (packageType === 'digital_physical') {
+            defaultDescription = 'Complete bundle: digital access + physical card game kit. Best value for organizations who want both online and offline play.';
+          }
+        }
+      }
+      
       setFormData({
         name: pkg.name || '',
-        description: pkg.description || '',
+        description: defaultDescription,
         imageUrl: pkg.imageUrl || '',
         status: pkg.status || 'active',
         visibility: pkg.visibility || 'public',
-        packageType: pkg.packageType || pkg.type || pkg.category || 'standard',
-        category: pkg.category || pkg.packageType || pkg.type || 'standard',
-        pricing: pkg.pricing || { amount: '', currency: 'EUR', billingType: 'one_time' },
-    targetAudiences: pkg.targetAudiences || [],
-    maxSeats: pkg.maxSeats || 5,
-    expiryTime: pkg.expiryTime || null,
-    expiryTimeUnit: pkg.expiryTimeUnit || null,
-  });
+        packageType: packageType,
+        category: pkg.category || packageType,
+        pricing: pkg.pricing || { amount: '', currency: 'USD', billingType: 'one_time' },
+        targetAudiences: pkg.targetAudiences || [],
+        maxSeats: pkg.maxSeats !== undefined ? pkg.maxSeats : (isB2C ? 1 : (isB2BOrB2E ? 5 : 5)),
+        expiryTime: pkg.expiryTime || (isB2C || isB2BOrB2E ? 1 : null),
+        expiryTimeUnit: pkg.expiryTimeUnit || (isB2C || isB2BOrB2E ? 'years' : null),
+      });
     } else {
       setEditing(null);
       // Set default values based on current tab - completely separate for B2C and B2B/B2E
@@ -368,27 +391,27 @@ export default function Packages() {
           visibility: 'public',
           packageType: 'standard', // Default to standard for B2C, but user can select any option
           category: 'standard',
-          pricing: { amount: '', currency: 'EUR', billingType: 'one_time' },
+          pricing: { amount: '', currency: 'USD', billingType: 'one_time' },
           targetAudiences: ['B2C'],
-          maxSeats: 5,
-          expiryTime: null,
-          expiryTimeUnit: null,
+          maxSeats: 1, // Default 1 for B2C
+          expiryTime: 1, // Default 1 year for B2C
+          expiryTimeUnit: 'years', // Always years for B2C
         });
       } else {
-        // B2B/B2E tab - same as B2C, user can select any package type
+        // B2B/B2E tab - only digital and digital_physical packages, fixed expiry 1 year
         setFormData({
           name: '',
           description: '',
           imageUrl: '',
           status: 'active',
           visibility: 'public',
-          packageType: 'standard', // Default to standard for B2B/B2E, but user can select any option
-          category: 'standard',
-          pricing: { amount: '', currency: 'EUR', billingType: 'one_time' },
+          packageType: 'digital', // Default to digital for B2B/B2E
+          category: 'digital',
+          pricing: { amount: '', currency: 'USD', billingType: 'one_time' },
           targetAudiences: ['B2B', 'B2E'],
-          maxSeats: 5,
-          expiryTime: null,
-          expiryTimeUnit: null,
+          maxSeats: 5, // Default 5 for B2B/B2E
+          expiryTime: 1, // Fixed 1 year for B2B/B2E
+          expiryTimeUnit: 'years', // Always years
         });
       }
     }
@@ -404,17 +427,39 @@ export default function Packages() {
     try {
       const api = getApiInstance();
       // Ensure category and packageType are properly set
-      // For B2C, use selected value, for B2B/B2E always use 'standard'
-      const finalPackageType = formData.packageType || 'standard';
+      const finalPackageType = formData.packageType || (mainTab === 0 ? 'digital' : 'digital');
+      
+      // Ensure B2C and B2B/B2E packages have correct defaults
+      const finalExpiryTime = (mainTab === 0 || mainTab === 1) ? 1 : (formData.expiryTime ? parseInt(formData.expiryTime) : null);
+      const finalExpiryTimeUnit = (mainTab === 0 || mainTab === 1) ? 'years' : (formData.expiryTimeUnit || null);
+      
+      // Set maxSeats based on package type for B2C and B2B/B2E
+      let finalMaxSeats = formData.maxSeats;
+      if ((mainTab === 0 || mainTab === 1) && finalPackageType) {
+        if (mainTab === 0) {
+          // B2C
+          if (finalPackageType === 'physical') {
+            finalMaxSeats = 0;
+          } else if (finalPackageType === 'digital' || finalPackageType === 'digital_physical') {
+            finalMaxSeats = 1;
+          }
+        } else {
+          // B2B/B2E - default 5 seats (editable)
+          finalMaxSeats = finalMaxSeats !== undefined ? finalMaxSeats : 5;
+        }
+      }
       
       const submitData = {
         ...formData,
         packageType: finalPackageType,
         category: finalPackageType,
         type: finalPackageType, // Also set type field for backward compatibility
-        targetAudiences: Array.isArray(formData.targetAudiences) ? formData.targetAudiences : [formData.targetAudiences || (mainTab === 0 ? 'B2C' : 'B2B')],
-        expiryTime: formData.expiryTime ? parseInt(formData.expiryTime) : null,
-        expiryTimeUnit: formData.expiryTimeUnit || null
+        targetAudiences: mainTab === 1 
+          ? ['B2B', 'B2E'] // B2B/B2E tab always uses both
+          : (Array.isArray(formData.targetAudiences) ? formData.targetAudiences : [formData.targetAudiences || (mainTab === 0 ? 'B2C' : 'B2B')]),
+        maxSeats: finalMaxSeats !== undefined ? finalMaxSeats : (mainTab === 0 ? 1 : 5),
+        expiryTime: finalExpiryTime,
+        expiryTimeUnit: finalExpiryTimeUnit
       };
       
       console.log('Submitting package data:', submitData); // Debug log
@@ -640,7 +685,7 @@ export default function Packages() {
       organizationId: '',
       contractPricing: {
         amount: selectedRequest.requestedModifications?.customPricing?.amount || '',
-        currency: selectedRequest.requestedModifications?.customPricing?.currency || 'EUR',
+        currency: selectedRequest.requestedModifications?.customPricing?.currency || 'USD',
         billingType: selectedRequest.requestedModifications?.customPricing?.billingType || 'one_time'
       },
       seatLimit: selectedRequest.requestedModifications?.seatLimit || '',
@@ -694,7 +739,7 @@ export default function Packages() {
         customPackageRequestId: selectedRequest._id, // Pass request ID so email can be sent to requester
         contractPricing: {
           amount: createPackageData.contractPricing.amount || selectedRequest.requestedModifications?.customPricing?.amount || 0,
-          currency: createPackageData.contractPricing.currency || 'EUR',
+          currency: createPackageData.contractPricing.currency || 'USD',
           billingType: createPackageData.contractPricing.billingType || selectedRequest.requestedModifications?.customPricing?.billingType || 'one_time',
           notes: selectedRequest.requestedModifications?.customPricing?.notes || ''
         },
@@ -755,7 +800,7 @@ export default function Packages() {
       setSelectedRequest(null);
       setCreatePackageData({
         organizationId: '',
-        contractPricing: { amount: '', currency: 'EUR', billingType: 'one_time' },
+        contractPricing: { amount: '', currency: 'USD', billingType: 'one_time' },
         seatLimit: '',
         contract: { startDate: '' },
         expiryTime: null,
@@ -957,7 +1002,7 @@ export default function Packages() {
                         <TableCell>
                           <Box>
                             <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                              €{pkg.pricing?.amount || 0}
+                              ${pkg.pricing?.amount || 0}
                             </Typography>
                             <Typography variant="caption" color="text.secondary">
                               {pkg.pricing?.billingType === 'one_time' ? 'One-time' :
@@ -1090,7 +1135,7 @@ export default function Packages() {
                             <TableCell>
                               <Box>
                                 <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                                  €{pkg.pricing?.amount || 0}
+                                  ${pkg.pricing?.amount || 0}
                                 </Typography>
                                 <Typography variant="caption" color="text.secondary">
                                   {pkg.pricing?.billingType === 'one_time' ? 'One-time' :
@@ -1226,7 +1271,7 @@ export default function Packages() {
                             <TableCell>
                               <Box>
                                 <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                                  €{pkg.contractPricing?.amount || 0}
+                                  ${pkg.contractPricing?.amount || 0}
                                 </Typography>
                                 <Typography variant="caption" color="text.secondary">
                                   {pkg.contractPricing?.billingType || 'N/A'}
@@ -1306,7 +1351,7 @@ export default function Packages() {
                       <TableCell>
                         <Box>
                           <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                            €{pkg.pricing?.amount || 0}
+                            ${pkg.pricing?.amount || 0}
                           </Typography>
                           <Typography variant="caption" color="text.secondary">
                             {pkg.pricing?.billingType === 'one_time' ? 'One-time' :
@@ -1462,6 +1507,8 @@ export default function Packages() {
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 required
+                disabled={mainTab === 0 && editing} // Fixed for B2C when editing
+                helperText={mainTab === 0 && editing ? 'Package name is fixed for B2C packages' : ''}
               />
             </Grid>
             <Grid item xs={12}>
@@ -1483,14 +1530,44 @@ export default function Packages() {
                   id="package-type-select"
                   value={formData.packageType || 'standard'}
                   label="Package Type / Category"
+                  disabled={(mainTab === 0 || mainTab === 1) && editing} // Fixed for B2C and B2B/B2E when editing
                   onChange={(e) => {
                     const newPackageType = e.target.value;
                     console.log('Package type selected:', newPackageType); // Debug
-                    setFormData(prev => ({ 
-                      ...prev, 
-                      packageType: newPackageType,
-                      category: newPackageType // Sync category with packageType
-                    }));
+                    
+                    setFormData(prev => {
+                      // Set default descriptions and maxSeats based on package type for B2C and B2B/B2E
+                      let description = prev.description;
+                      let maxSeats = prev.maxSeats;
+                      
+                      if (mainTab === 0) { // B2C tab (physical removed - only digital and digital_physical)
+                        if (newPackageType === 'digital') {
+                          description = 'Access to all digital cards and content. Unlimited digital access to online platform with regular content updates.';
+                          maxSeats = 1; // Digital has 1 seat
+                        } else if (newPackageType === 'digital_physical') {
+                          description = 'Everything in Digital Package plus physical card deck. Includes unique reference code included. Best value package with complete access.';
+                          maxSeats = 1; // Bundle has 1 seat
+                        }
+                      } else if (mainTab === 1) { // B2B/B2E tab (physical removed - only digital and digital_physical)
+                        if (newPackageType === 'digital') {
+                          description = 'Digital package for organizations. Online access with unique codes for team members.';
+                          maxSeats = 5; // B2B/B2E default to 5
+                        } else if (newPackageType === 'digital_physical') {
+                          description = 'Complete bundle: digital access + physical card game kit. Best value for organizations who want both online and offline play.';
+                          maxSeats = 5; // B2B/B2E default to 5
+                        }
+                      }
+                      
+                      return {
+                        ...prev, 
+                        packageType: newPackageType,
+                        category: newPackageType, // Sync category with packageType
+                        description: description || prev.description,
+                        maxSeats: maxSeats !== undefined ? maxSeats : (mainTab === 1 ? 5 : prev.maxSeats), // B2B/B2E default to 5
+                        expiryTime: (mainTab === 0 || mainTab === 1) ? 1 : prev.expiryTime, // Always 1 year for B2C and B2B/B2E
+                        expiryTimeUnit: (mainTab === 0 || mainTab === 1) ? 'years' : prev.expiryTimeUnit, // Always years for B2C and B2B/B2E
+                      };
+                    });
                   }}
                   required
                   MenuProps={{
@@ -1501,13 +1578,27 @@ export default function Packages() {
                     },
                   }}
                 >
-                  {/* Show all 5 package types for both B2C and B2B/B2E */}
-                  <MenuItem value="standard">Standard</MenuItem>
-                  <MenuItem value="digital">Digital</MenuItem>
-                  <MenuItem value="physical">Physical Cards</MenuItem>
-                  <MenuItem value="digital_physical">Digital + Physical Cards</MenuItem>
-                  <MenuItem value="renewal">Yearly Digital Renewal</MenuItem>
+                  {/* For B2C and B2B/B2E, only show 2 package types: digital, digital_physical (physical removed) */}
+                  {mainTab === 0 || mainTab === 1 ? (
+                    <>
+                      <MenuItem value="digital">Digital</MenuItem>
+                      <MenuItem value="digital_physical">Digital + Physical Cards</MenuItem>
+                    </>
+                  ) : (
+                    <>
+                      <MenuItem value="standard">Standard</MenuItem>
+                      <MenuItem value="digital">Digital</MenuItem>
+                      <MenuItem value="physical">Physical Cards</MenuItem>
+                      <MenuItem value="digital_physical">Digital + Physical Cards</MenuItem>
+                      <MenuItem value="renewal">Yearly Digital Renewal</MenuItem>
+                    </>
+                  )}
                 </Select>
+                {(mainTab === 0 || mainTab === 1) && (
+                  <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, ml: 1.5 }}>
+                    {editing ? 'Package type is fixed for B2C and B2B/B2E packages' : `Only Digital and Digital + Physical packages are available for ${mainTab === 0 ? 'B2C' : 'B2B/B2E'}`}
+                  </Typography>
+                )}
               </FormControl>
             </Grid>
             <Grid item xs={12} sm={6}>
@@ -1517,6 +1608,8 @@ export default function Packages() {
                 label="Status"
                 value={formData.status}
                 onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                disabled={(mainTab === 0 || mainTab === 1) && editing} // Fixed for B2C and B2B/B2E when editing
+                helperText={(mainTab === 0 || mainTab === 1) && editing ? 'Status is fixed for B2C and B2B/B2E packages' : ''}
               >
                 <MenuItem value="active">Active</MenuItem>
                 <MenuItem value="archived">Archived</MenuItem>
@@ -1529,6 +1622,8 @@ export default function Packages() {
                 label="Visibility"
                 value={formData.visibility}
                 onChange={(e) => setFormData({ ...formData, visibility: e.target.value })}
+                disabled={(mainTab === 0 || mainTab === 1) && editing} // Fixed for B2C and B2B/B2E when editing
+                helperText={(mainTab === 0 || mainTab === 1) && editing ? 'Visibility is fixed for B2C and B2B/B2E packages' : ''}
               >
                 <MenuItem value="public">Public</MenuItem>
                 <MenuItem value="hidden">Hidden</MenuItem>
@@ -1557,7 +1652,9 @@ export default function Packages() {
                   ...formData,
                   pricing: { ...formData.pricing, billingType: e.target.value }
                 })}
+                disabled={(mainTab === 0 || mainTab === 1) && editing} // Fixed for B2C and B2B/B2E when editing
                 required
+                helperText={(mainTab === 0 || mainTab === 1) && editing ? 'Billing type is fixed for B2C and B2B/B2E packages' : ''}
               >
                 <MenuItem value="one_time">One Time</MenuItem>
                 <MenuItem value="subscription">Subscription</MenuItem>
@@ -1573,6 +1670,7 @@ export default function Packages() {
                   value={formData.targetAudiences || []}
                   onChange={(e) => setFormData({ ...formData, targetAudiences: e.target.value })}
                   input={<OutlinedInput label="Target Audiences" />}
+                  disabled={(mainTab === 0 || mainTab === 1) && editing} // Fixed for B2C and B2B/B2E when editing
                   renderValue={(selected) => {
                     if (selected.length === 0) return '';
                     return selected.join(', ');
@@ -1589,6 +1687,11 @@ export default function Packages() {
                     </>
                   )}
                 </Select>
+                {(mainTab === 0 || mainTab === 1) && editing && (
+                  <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, ml: 1.5 }}>
+                    Target audience is fixed for B2C and B2B/B2E packages
+                  </Typography>
+                )}
               </FormControl>
             </Grid>
             <Grid item xs={12} sm={6}>
@@ -1596,38 +1699,61 @@ export default function Packages() {
                 fullWidth
                 label="Max Seats"
                 type="number"
-                value={formData.maxSeats || 5}
-                onChange={(e) => setFormData({ ...formData, maxSeats: parseInt(e.target.value) || 5 })}
+                value={formData.maxSeats !== undefined ? formData.maxSeats : (mainTab === 0 ? 1 : 5)}
+                onChange={(e) => {
+                  let maxSeats = parseInt(e.target.value) || (mainTab === 0 ? 1 : 5);
+                  setFormData({ ...formData, maxSeats });
+                }}
                 inputProps={{ min: 1 }}
-                helperText="Maximum number of seats/users allowed for this package"
+                disabled={(mainTab === 0 || mainTab === 1) && editing && formData.packageType === 'physical'}
+                helperText={
+                  mainTab === 0 && formData.packageType === 'physical' ? 'Physical packages typically have 0 seats (editable)' : 
+                  mainTab === 0 && (formData.packageType === 'digital' || formData.packageType === 'digital_physical') ? 'Digital and Bundle packages typically have 1 seat (editable)' :
+                  mainTab === 1 ? 'Default 5 seats for B2B/B2E packages (editable)' :
+                  'Maximum number of seats/users allowed for this package'
+                }
               />
             </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                select
-                label="Expiry Time Unit"
-                value={formData.expiryTimeUnit || ''}
-                onChange={(e) => setFormData({ ...formData, expiryTimeUnit: e.target.value })}
-                helperText="Select months or years"
-              >
-                <MenuItem value="">None</MenuItem>
-                <MenuItem value="months">Months</MenuItem>
-                <MenuItem value="years">Years</MenuItem>
-              </TextField>
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label={formData.expiryTimeUnit === 'months' ? 'Number of Months' : formData.expiryTimeUnit === 'years' ? 'Number of Years' : 'Expiry Time'}
-                type="number"
-                value={formData.expiryTime || ''}
-                onChange={(e) => setFormData({ ...formData, expiryTime: e.target.value ? parseInt(e.target.value) : null })}
-                inputProps={{ min: 1 }}
-                disabled={!formData.expiryTimeUnit}
-                helperText={formData.expiryTimeUnit ? `Enter number of ${formData.expiryTimeUnit}` : 'Select expiry time unit first'}
-              />
-            </Grid>
+            {(mainTab === 0 || mainTab === 1) ? (
+              // B2C and B2B/B2E tabs - Expiry time is fixed to 1 year
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="Expiry Time"
+                  value="1 Year"
+                  disabled
+                  helperText={(mainTab === 0 || mainTab === 1) ? 'B2C and B2B/B2E packages have a fixed expiry time of 1 year' : ''}
+                />
+              </Grid>
+            ) : (
+              // Other tabs - Allow custom expiry time
+              <>
+                <Grid item xs={12} sm={6}>
+                  <TextField
+                    fullWidth
+                    label="Expiry Time"
+                    type="number"
+                    value={formData.expiryTime !== undefined ? formData.expiryTime : 1}
+                    onChange={(e) => setFormData({ ...formData, expiryTime: parseInt(e.target.value) || 1 })}
+                    inputProps={{ min: 1 }}
+                    helperText="Enter expiry time value"
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <TextField
+                    fullWidth
+                    select
+                    label="Expiry Time Unit"
+                    value={formData.expiryTimeUnit || 'years'}
+                    onChange={(e) => setFormData({ ...formData, expiryTimeUnit: e.target.value })}
+                    helperText="Select months or years"
+                  >
+                    <MenuItem value="years">Years</MenuItem>
+                    <MenuItem value="months">Months</MenuItem>
+                  </TextField>
+                </Grid>
+              </>
+            )}
             {/* Included Cards field removed - packages are predefined */}
           </Grid>
         </DialogContent>
@@ -1894,7 +2020,7 @@ export default function Packages() {
           setCreatePackageDialogOpen(false);
           setCreatePackageData({
             organizationId: '',
-            contractPricing: { amount: '', currency: 'EUR', billingType: 'one_time' },
+            contractPricing: { amount: '', currency: 'USD', billingType: 'one_time' },
             seatLimit: '',
             contract: { startDate: '' },
             expiryTime: null,
@@ -1952,7 +2078,7 @@ export default function Packages() {
               <Grid item xs={12} sm={6}>
                 <TextField
                   fullWidth
-                  label="Contract Amount (€)"
+                  label="Contract Amount ($)"
                   type="number"
                   value={createPackageData.contractPricing.amount}
                   onChange={(e) => setCreatePackageData({
@@ -2049,7 +2175,7 @@ export default function Packages() {
                 setCreatePackageDialogOpen(false);
                 setCreatePackageData({
                   organizationId: '',
-                  contractPricing: { amount: '', currency: 'EUR', billingType: 'one_time' },
+                  contractPricing: { amount: '', currency: 'USD', billingType: 'one_time' },
                   seatLimit: '',
                   contract: { startDate: '', endDate: '' }
                 });
@@ -2080,7 +2206,7 @@ export default function Packages() {
           setEditCustomPackageData({
             name: '',
             seatLimit: '',
-            contractPricing: { amount: '', currency: 'EUR', billingType: 'one_time' },
+            contractPricing: { amount: '', currency: 'USD', billingType: 'one_time' },
             contract: { startDate: '', endDate: '', status: 'active' },
             expiryTime: null,
             expiryTimeUnit: null,
@@ -2122,7 +2248,7 @@ export default function Packages() {
                 <Grid item xs={12} sm={6}>
                   <TextField
                     fullWidth
-                    label="Contract Amount (€)"
+                    label="Contract Amount ($)"
                     type="number"
                     value={editCustomPackageData.contractPricing.amount}
                     onChange={(e) => setEditCustomPackageData({
@@ -2290,7 +2416,7 @@ export default function Packages() {
                                 return (
                                   <Chip
                                     key={productIdStr}
-                                    label={`${product.name} (€${product.price})`}
+                                    label={`${product.name} ($${product.price})`}
                                     size="small"
                                     sx={{
                                       backgroundColor: 'rgba(11, 120, 151, 0.1)',
@@ -2343,7 +2469,7 @@ export default function Packages() {
                                     }}
                                   />
                                   <Typography variant="caption" color="text.secondary">
-                                    €{product.price}
+                                    ${product.price}
                                   </Typography>
                                 </Box>
                               </MenuItem>
@@ -2368,7 +2494,7 @@ export default function Packages() {
             setEditCustomPackageData({
               name: '',
               seatLimit: '',
-              contractPricing: { amount: '', currency: 'EUR', billingType: 'one_time' },
+              contractPricing: { amount: '', currency: 'USD', billingType: 'one_time' },
               contract: { startDate: '', endDate: '', status: 'active' },
               status: 'active'
             });

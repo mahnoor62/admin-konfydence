@@ -76,15 +76,27 @@ export default function Sales() {
       const api = getApiInstance();
       
       if (tabValue === 0) {
-        // Fetch transactions
-        const [allTxRes, b2bRes, customPackagesRes] = await Promise.all([
-          api.get('/transactions/all', { params: { type: typeFilter !== 'all' ? typeFilter : undefined } }),
-          api.get('/transactions/b2b-b2e'),
-          api.get('/custom-packages'),
+        // Fetch all transactions - ensure we get ALL transaction types
+        const params = {};
+        if (typeFilter && typeFilter !== 'all') {
+          params.type = typeFilter;
+        }
+        // When filter is 'all' or undefined, don't pass type param to get ALL transactions
+        
+        const allTxRes = await api.get('/transactions/all', { params });
+        
+        // Set all transactions - this will show ALL transaction types
+        setAllTransactions(allTxRes.data || []);
+        
+        // Also fetch B2B/B2E contracts and custom packages for the contracts tab (tabValue === 1)
+        // Use Promise.allSettled to handle errors gracefully - don't let these break transactions display
+        const [b2bResult, customPackagesResult] = await Promise.allSettled([
+          api.get('/transactions/b2b-b2e').catch(() => ({ data: [] })),
+          api.get('/custom-packages').catch(() => ({ data: [] })),
         ]);
         
-        // Set all transactions
-        setAllTransactions(allTxRes.data || []);
+        const b2bRes = b2bResult.status === 'fulfilled' ? b2bResult.value : { data: [] };
+        const customPackagesRes = customPackagesResult.status === 'fulfilled' ? customPackagesResult.value : { data: [] };
         
         // Combine B2B/B2E transactions with custom packages
         // Filter out transactions without organizationId or customPackageId
@@ -101,7 +113,7 @@ export default function Sales() {
             customPackageId: pkg,
             type: pkg.organizationId?.segment === 'B2E' ? 'b2e_contract' : 'b2b_contract',
             amount: pkg.contractPricing?.amount || 0,
-            currency: pkg.contractPricing?.currency || 'EUR',
+            currency: pkg.contractPricing?.currency || 'USD',
             status: pkg.contract?.status === 'active' ? 'paid' : pkg.contract?.status === 'expired' ? 'expired' : 'pending',
             contractPeriod: {
               startDate: pkg.contract?.startDate,
@@ -138,7 +150,7 @@ export default function Sales() {
             customPackageId: pkg,
             type: pkg.organizationId?.segment === 'B2E' ? 'b2e_contract' : 'b2b_contract',
             amount: pkg.contractPricing?.amount || 0,
-            currency: pkg.contractPricing?.currency || 'EUR',
+            currency: pkg.contractPricing?.currency || 'USD',
             status: pkg.contract?.status === 'active' ? 'paid' : pkg.contract?.status === 'expired' ? 'expired' : 'pending',
             contractPeriod: {
               startDate: pkg.contract?.startDate,
@@ -167,17 +179,20 @@ export default function Sales() {
     } catch (err) {
       console.error('Error fetching sales data:', err);
       const errorMessage = err.response?.data?.error || 'Failed to load sales data';
-      // If error is "User not found", don't show error - just show empty state in table
-      if (errorMessage === 'User not found') {
-        setError(null);
-        if (tabValue === 0) {
-          setAllTransactions([]); // Set empty array to show "No transactions found"
-        } else if (tabValue === 1) {
-          setB2bB2eContracts([]); // Set empty array to show "No B2B/B2E contracts found"
-        } else if (tabValue === 2) {
-          setAllMemberships([]); // Set empty array to show "No memberships found"
+      // If error is "User not found" or 404 from B2B/B2E endpoint, don't break transactions display
+      // Only show error if we actually failed to get the main data for the current tab
+      if (errorMessage === 'User not found' || err.response?.status === 404) {
+        setError(null); // Hide error - transactions might still be available
+        // If transactions weren't set yet, set empty arrays
+        if (tabValue === 0 && allTransactions.length === 0) {
+          setAllTransactions([]); // Show "No transactions found"
+        } else if (tabValue === 1 && b2bB2eContracts.length === 0) {
+          setB2bB2eContracts([]); // Show "No B2B/B2E contracts found"
+        } else if (tabValue === 2 && allMemberships.length === 0) {
+          setAllMemberships([]); // Show "No memberships found"
         }
       } else {
+        // Only show error for actual failures, not for optional endpoints
         setError(errorMessage);
       }
     } finally {
@@ -227,8 +242,8 @@ export default function Sales() {
     }
   };
 
-  const formatCurrency = (amount, currency = 'EUR') => {
-    const currencySymbol = currency === 'EUR' ? '€' : currency;
+  const formatCurrency = (amount, currency = 'USD') => {
+    const currencySymbol = currency === 'USD' ? '$' : currency === 'EUR' ? '€' : currency;
     return `${currencySymbol} ${(amount || 0).toFixed(2)}`;
   };
 
@@ -382,10 +397,33 @@ export default function Sales() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  allTransactions.map((tx) => (
+                  allTransactions.map((tx) => {
+                    // Handle missing/deleted users - show "User Deleted" if userId exists but user data is missing/null
+                    let userDisplay = 'N/A';
+                    if (tx.userId) {
+                      // Check if userId is an object (populated) or just an ID
+                      if (typeof tx.userId === 'object' && tx.userId !== null) {
+                        // User is populated - check if it has name or email
+                        if (tx.userId.name || tx.userId.email) {
+                          userDisplay = tx.userId.name || tx.userId.email;
+                        } else {
+                          // userId exists but no user data - user was deleted
+                          userDisplay = 'User Deleted';
+                        }
+                      } else {
+                        // userId is just an ID but not populated - user might be deleted
+                        userDisplay = 'User Deleted';
+                      }
+                    } else if (tx.organizationId?.name) {
+                      userDisplay = tx.organizationId.name;
+                    } else if (tx.schoolId?.name) {
+                      userDisplay = tx.schoolId.name;
+                    }
+                    
+                    return (
                     <TableRow key={tx._id}>
                       <TableCell>
-                        {tx.userId?.name || tx.userId?.email || tx.organizationId?.name || 'N/A'}
+                        {userDisplay}
                       </TableCell>
                       <TableCell>
                         {tx.packageId?.name || tx.customPackageId?.name || 'N/A'}
@@ -415,7 +453,8 @@ export default function Sales() {
                         </IconButton>
                       </TableCell>
                     </TableRow>
-                  ))
+                    );
+                  })
                 )}
               </TableBody>
             </Table>

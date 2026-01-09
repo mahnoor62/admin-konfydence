@@ -484,7 +484,7 @@
 //                   </TableCell>
 //                   <TableCell>{product.name}</TableCell>
 //                   <TableCell>{product.type}</TableCell>
-//                   <TableCell>€{product.price}</TableCell>
+//                   <TableCell>${product.price}</TableCell>
 //                   <TableCell>{product.isActive ? 'Yes' : 'No'}</TableCell>
 //                   <TableCell>
 //                     <IconButton size="small" onClick={() => handleOpen(product)}>
@@ -857,7 +857,6 @@ function ProductsContent() {
   const [formData, setFormData] = useState({
     name: '',
     description: '',
-    price: '',
     type: '',
     category: '',
     targetAudience: '',
@@ -1148,10 +1147,11 @@ function ProductsContent() {
       setFormData({
         name: product.name,
         description: product.description,
-        price: product.price.toString(),
         type: product.type || '',
         category: product.category || '',
-        targetAudience: product.targetAudience || '',
+        title: product.title || '',
+        price: product.price ? product.price.toString() : '',
+        targetAudience: Array.isArray(product.targetAudience) ? product.targetAudience : (product.targetAudience ? [product.targetAudience] : []),
         imageUrl: product.imageUrl,
         badges: product.badges || [],
         isActive: product.isActive,
@@ -1173,10 +1173,11 @@ function ProductsContent() {
       setFormData({
         name: '',
         description: '',
-        price: '',
-        type: '',
-        category: '',
-        targetAudience: '',
+    type: '',
+    category: '',
+    title: '',
+    price: '',
+    targetAudience: [],
         imageUrl: '',
         badges: [],
         isActive: true,
@@ -1367,7 +1368,50 @@ function ProductsContent() {
 
   const handleSubmit = async () => {
     try {
-      // validation
+      // validation - Only Image, Target Audience, and Visibility are required
+      if (!formData.imageUrl) {
+        setSnackbar({
+          open: true,
+          message: 'Please upload a product image before saving',
+          severity: 'error',
+        });
+        return;
+      }
+      if (!formData.title || !formData.title.trim()) {
+        setSnackbar({
+          open: true,
+          message: 'Product title is required',
+          severity: 'error',
+        });
+        return;
+      }
+      if (!formData.price || isNaN(parseFloat(formData.price))) {
+        setSnackbar({
+          open: true,
+          message: 'Valid product price is required',
+          severity: 'error',
+        });
+        return;
+      }
+      if (!formData.targetAudience || !Array.isArray(formData.targetAudience) || formData.targetAudience.length === 0) {
+        setSnackbar({
+          open: true,
+          message: 'At least one target audience is required',
+          severity: 'error',
+        });
+        return;
+      }
+      if (!formData.visibility) {
+        setSnackbar({
+          open: true,
+          message: 'Visibility is required',
+          severity: 'error',
+        });
+        return;
+      }
+      
+      // Commented out validations for removed fields
+      /* 
       if (!formData.name.trim()) {
         setSnackbar({
           open: true,
@@ -1384,14 +1428,6 @@ function ProductsContent() {
         });
         return;
       }
-      if (!formData.price || isNaN(parseFloat(formData.price))) {
-        setSnackbar({
-          open: true,
-          message: 'Valid product price is required',
-          severity: 'error',
-        });
-        return;
-      }
       if (!formData.type) {
         setSnackbar({
           open: true,
@@ -1400,26 +1436,20 @@ function ProductsContent() {
         });
         return;
       }
-      if (!formData.imageUrl) {
-        setSnackbar({
-          open: true,
-          message: 'Please upload a product image before saving',
-          severity: 'error',
-        });
-        return;
-      }
+      */
 
       const payload = {
-        name: formData.name.trim(),
-        description: formData.description.trim(),
-        price: parseFloat(formData.price),
-        type: formData.type,
-        category: formData.category || null,
-        targetAudience: formData.targetAudience || null,
+        // Required fields
         imageUrl: formData.imageUrl,
-        badges: formData.badges || [],
-        isActive: formData.isActive,
+        title: formData.title.trim(),
+        price: parseFloat(formData.price),
+        targetAudience: formData.targetAudience,
         visibility: formData.visibility || 'public',
+        
+        // Default values for commented out fields (to maintain backend compatibility)
+        name: formData.name?.trim() || 'Product',
+        description: formData.description?.trim() || '',
+        isActive: formData.isActive !== undefined ? formData.isActive : true,
         allowedOrganizations: formData.visibility === 'private' ? (formData.allowedOrganizations || []) : [],
         allowedInstitutes: formData.visibility === 'private' ? (formData.allowedInstitutes || []) : [],
         level1: formData.level1 || [],
@@ -1736,7 +1766,6 @@ function ProductsContent() {
               <TableRow>
                 <TableCell>Image</TableCell>
                 <TableCell>Name</TableCell>
-                <TableCell>Type</TableCell>
                 <TableCell>Cards</TableCell>
                 <TableCell>Target Audience</TableCell>
                 <TableCell>Price</TableCell>
@@ -1748,7 +1777,7 @@ function ProductsContent() {
             <TableBody>
               {loadingProducts ? (
                 <TableRow>
-                  <TableCell colSpan={9} align="center" sx={{ py: 5 }}>
+                  <TableCell colSpan={8} align="center" sx={{ py: 5 }}>
                     <CircularProgress size={32} />
                   </TableCell>
                 </TableRow>
@@ -1761,7 +1790,7 @@ function ProductsContent() {
                 if (filteredProducts.length === 0) {
                   return (
                     <TableRow key="no-products">
-                      <TableCell colSpan={9} align="center" sx={{ py: 4 }}>
+                      <TableCell colSpan={8} align="center" sx={{ py: 4 }}>
                         <Typography variant="body2" color="text.secondary">
                           No products found{visibilityFilter !== 'all' ? ` with ${visibilityFilter} visibility` : ''}. Click &ldquo;Add Product&rdquo; to
                           create your first product.
@@ -1772,14 +1801,19 @@ function ProductsContent() {
                 }
                 
                 return filteredProducts.map((product) => {
-                  // Format target audience for display
-                  const getTargetAudienceLabel = (targetAudience) => {
-                    if (!targetAudience) return '-';
-                    if (targetAudience === 'private-users') return 'B2C';
-                    if (targetAudience === 'schools') return 'B2E';
-                    if (targetAudience === 'businesses') return 'B2B';
-                    return targetAudience;
+                  // Format target audience for display (handle both single and array)
+                  const getTargetAudienceLabels = (targetAudience) => {
+                    if (!targetAudience) return [];
+                    const audiences = Array.isArray(targetAudience) ? targetAudience : [targetAudience];
+                    return audiences.map(ta => {
+                      if (ta === 'private-users') return { value: ta, label: 'B2C' };
+                      if (ta === 'schools') return { value: ta, label: 'B2E' };
+                      if (ta === 'businesses') return { value: ta, label: 'B2B' };
+                      return { value: ta, label: ta };
+                    });
                   };
+
+                  const targetAudiences = getTargetAudienceLabels(product.targetAudience);
 
                   return (
                     <TableRow key={product._id}>
@@ -1815,8 +1849,7 @@ function ProductsContent() {
                           </Box>
                         )}
                       </TableCell>
-                      <TableCell>{product.name}</TableCell>
-                      <TableCell>{product.type}</TableCell>
+                      <TableCell>{product.title || product.name}</TableCell>
                       <TableCell>
                         {(() => {
                           const totalCards = (product.level1?.length || 0) + (product.level2?.length || 0) + (product.level3?.length || 0);
@@ -1844,31 +1877,40 @@ function ProductsContent() {
                         })()}
                       </TableCell>
                       <TableCell>
-                        <Chip
-                          label={getTargetAudienceLabel(product.targetAudience)}
-                          size="small"
-                          sx={{
-                            backgroundColor:
-                              product.targetAudience === 'private-users'
-                                ? 'rgba(11, 120, 151, 0.1)'
-                                : product.targetAudience === 'schools'
-                                ? 'rgba(255, 152, 0, 0.1)'
-                                : product.targetAudience === 'businesses'
-                                ? 'rgba(76, 175, 80, 0.1)'
-                                : 'rgba(0, 0, 0, 0.05)',
-                            color:
-                              product.targetAudience === 'private-users'
-                                ? '#0B7897'
-                                : product.targetAudience === 'schools'
-                                ? '#FF9800'
-                                : product.targetAudience === 'businesses'
-                                ? '#4CAF50'
-                                : 'text.secondary',
-                            fontWeight: 600,
-                          }}
-                        />
+                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                          {targetAudiences.length === 0 ? (
+                            <Typography variant="caption" color="text.secondary">-</Typography>
+                          ) : (
+                            targetAudiences.map((ta) => (
+                              <Chip
+                                key={ta.value}
+                                label={ta.label}
+                                size="small"
+                                sx={{
+                                  backgroundColor:
+                                    ta.value === 'private-users'
+                                      ? 'rgba(11, 120, 151, 0.1)'
+                                      : ta.value === 'schools'
+                                      ? 'rgba(255, 152, 0, 0.1)'
+                                      : ta.value === 'businesses'
+                                      ? 'rgba(76, 175, 80, 0.1)'
+                                      : 'rgba(0, 0, 0, 0.05)',
+                                  color:
+                                    ta.value === 'private-users'
+                                      ? '#0B7897'
+                                      : ta.value === 'schools'
+                                      ? '#FF9800'
+                                      : ta.value === 'businesses'
+                                      ? '#4CAF50'
+                                      : 'text.secondary',
+                                  fontWeight: 600,
+                                }}
+                              />
+                            ))
+                          )}
+                        </Box>
                       </TableCell>
-                      <TableCell>€{product.price}</TableCell>
+                      <TableCell>${product.price}</TableCell>
                       <TableCell>
                         <Chip
                           label={product.visibility === 'private' ? 'Private' : 'Public'}
@@ -1930,6 +1972,76 @@ function ProductsContent() {
                 pt: 2,
               }}
             >
+              {/* Image Upload - Required */}
+              <Box
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 2,
+                  flexWrap: 'wrap',
+                }}
+              >
+                <Button
+                  variant="outlined"
+                  onClick={triggerImagePicker}
+                  disabled={uploadingImage}
+                >
+                  {uploadingImage
+                    ? 'Uploading...'
+                    : formData.imageUrl
+                    ? 'Replace Image'
+                    : 'Upload Image'}
+                </Button>
+                {formData.imageUrl && (
+                  <Box
+                    component="img"
+                    src={formData.imageUrl}
+                    alt="Product preview"
+                    sx={{
+                      width: 120,
+                      height: 80,
+                      objectFit: 'cover',
+                      borderRadius: 2,
+                      border: '1px solid rgba(0,0,0,0.1)',
+                    }}
+                  />
+                )}
+                <input
+                  type="file"
+                  accept="image/*"
+                  ref={fileInputRef}
+                  style={{ display: 'none' }}
+                  onChange={handleImageUpload}
+                />
+              </Box>
+
+              {/* Title - Required */}
+              <TextField
+                label="Title *"
+                fullWidth
+                required
+                value={formData.title}
+                onChange={(e) =>
+                  setFormData({ ...formData, title: e.target.value })
+                }
+                helperText="Enter product title"
+              />
+
+              {/* Price - Required */}
+              <TextField
+                label="Price *"
+                type="number"
+                fullWidth
+                required
+                value={formData.price}
+                onChange={(e) =>
+                  setFormData({ ...formData, price: e.target.value })
+                }
+                helperText="Enter product price"
+              />
+
+              {/* Commented out fields - Only Image, Price, Target Audience, and Visibility are required */}
+              {/* 
               <TextField
                 label="Name"
                 fullWidth
@@ -1952,17 +2064,6 @@ function ProductsContent() {
                 />
               </Box>
               <TextField
-                label="Price"
-                type="number"
-                fullWidth
-                required
-                value={formData.price}
-                onChange={(e) =>
-                  setFormData({ ...formData, price: e.target.value })
-                }
-              />
-              {/* Use Case / Type Dropdown */}
-              <TextField
                 select
                 label="Type (Use Case / Type)"
                 fullWidth
@@ -1980,7 +2081,6 @@ function ProductsContent() {
                 ))}
               </TextField>
               
-              {/* Product Category Dropdown */}
               <TextField
                 select
                 label="Category (Product Category)"
@@ -1998,25 +2098,67 @@ function ProductsContent() {
                   </MenuItem>
                 ))}
               </TextField>
+              */}
               
-              {/* Target Audience Dropdown */}
-              <TextField
-                select
-                label="Target Audience"
-                fullWidth
-                value={formData.targetAudience}
-                onChange={(e) =>
-                  setFormData({ ...formData, targetAudience: e.target.value })
-                }
-                helperText="Select target audience for B2C/B2B detection"
-              >
-                <MenuItem value="">None</MenuItem>
-                <MenuItem value="private-users">Private Users (B2C)</MenuItem>
-                <MenuItem value="schools">Schools (B2E)</MenuItem>
-                <MenuItem value="businesses">Businesses (B2B)</MenuItem>
-              </TextField>
+              {/* Target Audience - Required (Multiple Selection) */}
+              <FormControl fullWidth required>
+                <InputLabel id="target-audience-label">Target Audience</InputLabel>
+                <Select
+                  labelId="target-audience-label"
+                  multiple
+                  value={formData.targetAudience || []}
+                  onChange={(e) =>
+                    setFormData({ ...formData, targetAudience: e.target.value })
+                  }
+                  input={<OutlinedInput label="Target Audience" />}
+                  renderValue={(selected) => (
+                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                      {selected.length === 0 ? (
+                        <Typography variant="body2" color="text.secondary">
+                          None selected
+                        </Typography>
+                      ) : (
+                        selected.map((value) => {
+                          const labels = {
+                            'private-users': 'B2C',
+                            'schools': 'B2E',
+                            'businesses': 'B2B'
+                          };
+                          return (
+                            <Chip
+                              key={value}
+                              label={labels[value] || value}
+                              size="small"
+                              sx={{
+                                backgroundColor: value === 'private-users'
+                                  ? 'rgba(11, 120, 151, 0.1)'
+                                  : value === 'schools'
+                                  ? 'rgba(255, 152, 0, 0.1)'
+                                  : 'rgba(76, 175, 80, 0.1)',
+                                color: value === 'private-users'
+                                  ? '#0B7897'
+                                  : value === 'schools'
+                                  ? '#FF9800'
+                                  : '#4CAF50',
+                                fontWeight: 500,
+                              }}
+                            />
+                          );
+                        })
+                      )}
+                    </Box>
+                  )}
+                >
+                  <MenuItem value="private-users">Private Users (B2C)</MenuItem>
+                  <MenuItem value="schools">Schools (B2E)</MenuItem>
+                  <MenuItem value="businesses">Businesses (B2B)</MenuItem>
+                </Select>
+                <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5 }}>
+                  Select one or more target audiences
+                </Typography>
+              </FormControl>
               
-              {/* Visibility Toggle */}
+              {/* Visibility - Required */}
               <FormControl fullWidth>
                 <InputLabel id="visibility-label">Visibility</InputLabel>
                 <Select
@@ -2037,8 +2179,8 @@ function ProductsContent() {
                 </Typography>
               </FormControl>
 
-              {/* Private Access Selection - Only show when visibility is private */}
-              {formData.visibility === 'private' && (
+              {/* Commented out Private Access Selection */}
+              {/* {formData.visibility === 'private' && (
                 <Box sx={{ mt: 2 }}>
                   <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 'bold' }}>
                     Select Access
@@ -2048,7 +2190,6 @@ function ProductsContent() {
                     <Tab label="Institutes" />
                   </Tabs>
                   
-                  {/* Organizations Tab */}
                   {accessTab === 0 && (
                     <FormControl fullWidth>
                       <InputLabel id="organizations-label">Select Organizations</InputLabel>
@@ -2112,7 +2253,6 @@ function ProductsContent() {
                     </FormControl>
                   )}
                   
-                  {/* Institutes Tab */}
                   {accessTab === 1 && (
                     <FormControl fullWidth>
                       <InputLabel id="institutes-label">Select Institutes</InputLabel>
@@ -2176,16 +2316,10 @@ function ProductsContent() {
                   )}
                 </Box>
               )}
-              
-              {/* Commented out Add Type button - using fixed list instead */}
-              {/* <Button
-                variant="outlined"
-                startIcon={<AddIcon />}
-                onClick={handleTypeDialogOpen}
-                sx={{ mt: 1, whiteSpace: 'nowrap' }}
-              >
-                Add Type
-              </Button> */}
+              */}
+
+              {/* Commented out duplicate image upload and badges field */}
+              {/* 
               <Box
                 sx={{
                   display: 'flex',
@@ -2288,15 +2422,15 @@ function ProductsContent() {
                   ))}
                 </Select>
               </FormControl>
-              
-              {/* Level-based Card Selection - Only show when target audience is selected */}
-              {formData.targetAudience && (
+              */}
+
+              {/* Level-based Card Selection */}
+              {formData.targetAudience && Array.isArray(formData.targetAudience) && formData.targetAudience.length > 0 && (
                 <>
                   <Typography variant="subtitle1" sx={{ mt: 2, mb: 1, fontWeight: 'bold' }}>
                     Attach Cards by Level
                   </Typography>
                   <Grid container spacing={2}>
-                    {/* Level 1 Dropdown */}
                     <Grid item xs={12} md={4}>
                       <FormControl fullWidth>
                         <InputLabel id="level1-label">Level 1 Cards</InputLabel>
@@ -2341,29 +2475,31 @@ function ProductsContent() {
                               Loading...
                             </MenuItem>
                           ) : allCards.filter(card => {
-                            // Filter cards by target audience
+                            // Filter cards by target audience (multiple selection support)
                             if (!card.targetAudiences || card.targetAudiences.length === 0) return false;
                             const targetMap = {
                               'private-users': 'B2C',
                               'schools': 'B2E',
                               'businesses': 'B2B'
                             };
-                            const targetValue = targetMap[formData.targetAudience];
-                            return card.targetAudiences.includes(targetValue);
+                            const selectedTargets = Array.isArray(formData.targetAudience) ? formData.targetAudience : [formData.targetAudience];
+                            const targetValues = selectedTargets.map(ta => targetMap[ta]).filter(Boolean);
+                            return targetValues.some(tv => card.targetAudiences.includes(tv));
                           }).length === 0 ? (
-                            <MenuItem disabled>No cards available for this target audience</MenuItem>
+                            <MenuItem disabled>No cards available for selected target audience(s)</MenuItem>
                           ) : (
                             allCards
                               .filter(card => {
-                                // Filter cards by target audience
+                                // Filter cards by target audience (multiple selection support)
                                 if (!card.targetAudiences || card.targetAudiences.length === 0) return false;
                                 const targetMap = {
                                   'private-users': 'B2C',
                                   'schools': 'B2E',
                                   'businesses': 'B2B'
                                 };
-                                const targetValue = targetMap[formData.targetAudience];
-                                return card.targetAudiences.includes(targetValue);
+                                const selectedTargets = Array.isArray(formData.targetAudience) ? formData.targetAudience : [formData.targetAudience];
+                                const targetValues = selectedTargets.map(ta => targetMap[ta]).filter(Boolean);
+                                return targetValues.some(tv => card.targetAudiences.includes(tv));
                               })
                               .map((card) => (
                                 <MenuItem key={card._id} value={card._id}>
@@ -2375,7 +2511,6 @@ function ProductsContent() {
                       </FormControl>
                     </Grid>
 
-                    {/* Level 2 Dropdown */}
                     <Grid item xs={12} md={4}>
                       <FormControl fullWidth>
                         <InputLabel id="level2-label">Level 2 Cards</InputLabel>
@@ -2420,29 +2555,31 @@ function ProductsContent() {
                               Loading...
                             </MenuItem>
                           ) : allCards.filter(card => {
-                            // Filter cards by target audience
+                            // Filter cards by target audience (multiple selection support)
                             if (!card.targetAudiences || card.targetAudiences.length === 0) return false;
                             const targetMap = {
                               'private-users': 'B2C',
                               'schools': 'B2E',
                               'businesses': 'B2B'
                             };
-                            const targetValue = targetMap[formData.targetAudience];
-                            return card.targetAudiences.includes(targetValue);
+                            const selectedTargets = Array.isArray(formData.targetAudience) ? formData.targetAudience : [formData.targetAudience];
+                            const targetValues = selectedTargets.map(ta => targetMap[ta]).filter(Boolean);
+                            return targetValues.some(tv => card.targetAudiences.includes(tv));
                           }).length === 0 ? (
-                            <MenuItem disabled>No cards available for this target audience</MenuItem>
+                            <MenuItem disabled>No cards available for selected target audience(s)</MenuItem>
                           ) : (
                             allCards
                               .filter(card => {
-                                // Filter cards by target audience
+                                // Filter cards by target audience (multiple selection support)
                                 if (!card.targetAudiences || card.targetAudiences.length === 0) return false;
                                 const targetMap = {
                                   'private-users': 'B2C',
                                   'schools': 'B2E',
                                   'businesses': 'B2B'
                                 };
-                                const targetValue = targetMap[formData.targetAudience];
-                                return card.targetAudiences.includes(targetValue);
+                                const selectedTargets = Array.isArray(formData.targetAudience) ? formData.targetAudience : [formData.targetAudience];
+                                const targetValues = selectedTargets.map(ta => targetMap[ta]).filter(Boolean);
+                                return targetValues.some(tv => card.targetAudiences.includes(tv));
                               })
                               .map((card) => (
                                 <MenuItem key={card._id} value={card._id}>
@@ -2454,7 +2591,6 @@ function ProductsContent() {
                       </FormControl>
                     </Grid>
 
-                    {/* Level 3 Dropdown */}
                     <Grid item xs={12} md={4}>
                       <FormControl fullWidth>
                         <InputLabel id="level3-label">Level 3 Cards</InputLabel>
@@ -2499,29 +2635,31 @@ function ProductsContent() {
                               Loading...
                             </MenuItem>
                           ) : allCards.filter(card => {
-                            // Filter cards by target audience
+                            // Filter cards by target audience (multiple selection support)
                             if (!card.targetAudiences || card.targetAudiences.length === 0) return false;
                             const targetMap = {
                               'private-users': 'B2C',
                               'schools': 'B2E',
                               'businesses': 'B2B'
                             };
-                            const targetValue = targetMap[formData.targetAudience];
-                            return card.targetAudiences.includes(targetValue);
+                            const selectedTargets = Array.isArray(formData.targetAudience) ? formData.targetAudience : [formData.targetAudience];
+                            const targetValues = selectedTargets.map(ta => targetMap[ta]).filter(Boolean);
+                            return targetValues.some(tv => card.targetAudiences.includes(tv));
                           }).length === 0 ? (
-                            <MenuItem disabled>No cards available for this target audience</MenuItem>
+                            <MenuItem disabled>No cards available for selected target audience(s)</MenuItem>
                           ) : (
                             allCards
                               .filter(card => {
-                                // Filter cards by target audience
+                                // Filter cards by target audience (multiple selection support)
                                 if (!card.targetAudiences || card.targetAudiences.length === 0) return false;
                                 const targetMap = {
                                   'private-users': 'B2C',
                                   'schools': 'B2E',
                                   'businesses': 'B2B'
                                 };
-                                const targetValue = targetMap[formData.targetAudience];
-                                return card.targetAudiences.includes(targetValue);
+                                const selectedTargets = Array.isArray(formData.targetAudience) ? formData.targetAudience : [formData.targetAudience];
+                                const targetValues = selectedTargets.map(ta => targetMap[ta]).filter(Boolean);
+                                return targetValues.some(tv => card.targetAudiences.includes(tv));
                               })
                               .map((card) => (
                                 <MenuItem key={card._id} value={card._id}>
@@ -2538,6 +2676,9 @@ function ProductsContent() {
                   </Typography>
                 </>
               )}
+
+              {/* Commented out Active switch */}
+              {/* 
               <FormControlLabel
                 control={
                   <Switch
@@ -2552,6 +2693,7 @@ function ProductsContent() {
                 }
                 label="Active"
               />
+              */}
             </Box>
           </DialogContent>
           <DialogActions>
@@ -2834,7 +2976,7 @@ function ProductsContent() {
                       Price
                     </Typography>
                     <Typography variant="body1" sx={{ mb: 2 }}>
-                      €{viewingProduct.price}
+                      ${viewingProduct.price}
                     </Typography>
                   </Grid>
                   <Grid item xs={12} sm={6}>

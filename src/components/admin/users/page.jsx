@@ -160,7 +160,7 @@ export default function Users() {
             <TableRow>
               <TableCell>Name</TableCell>
               <TableCell>Email</TableCell>
-              {tabValue !== 0 && <TableCell>Organization</TableCell>}
+              {tabValue !== 0 && <TableCell>{tabValue === 2 ? 'Institute' : 'Organization'}</TableCell>}
               <TableCell>Membership Status</TableCell>
               <TableCell>Active Packages</TableCell>
               <TableCell>Last Login</TableCell>
@@ -273,7 +273,7 @@ export default function Users() {
                   selectedUser.transactions.map((tx, idx) => (
                     <Box key={idx} sx={{ mb: 1, p: 1, bgcolor: '#f5f5f5', borderRadius: 1 }}>
                       <Typography><strong>Type:</strong> {tx.type}</Typography>
-                      <Typography><strong>Amount:</strong> ${tx.amount} {(tx.currency === 'EUR' ? '€' : tx.currency)}</Typography>
+                      <Typography><strong>Amount:</strong> ${tx.amount} {(tx.currency === 'USD' ? '$' : tx.currency === 'EUR' ? '€' : tx.currency)}</Typography>
                       <Typography><strong>Status:</strong> {tx.status}</Typography>
                       <Typography><strong>Date:</strong> {new Date(tx.createdAt).toLocaleDateString()}</Typography>
                     </Box>

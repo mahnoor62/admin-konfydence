@@ -78,7 +78,7 @@ export default function AdminDashboard() {
   }, []);
 
   const formatCurrency = (amount) => {
-    return `€ ${(amount || 0).toFixed(2)}`;
+    return `$ ${(amount || 0).toFixed(2)}`;
   };
 
   const formatDate = (date) => {

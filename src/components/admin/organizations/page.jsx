@@ -865,7 +865,7 @@ export default function Organizations() {
                           <Typography><strong>End Date:</strong> {new Date(pkg.contract.endDate).toLocaleDateString()}</Typography>
                         )}
                         {pkg.contractPricing?.amount && (
-                          <Typography><strong>Price:</strong> €{pkg.contractPricing.amount} ({pkg.contractPricing.billingType || 'N/A'})</Typography>
+                          <Typography><strong>Price:</strong> ${pkg.contractPricing.amount} ({pkg.contractPricing.billingType || 'N/A'})</Typography>
                         )}
                       </Box>
                     ));
