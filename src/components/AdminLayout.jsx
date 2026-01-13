@@ -56,7 +56,7 @@ const menuItems = [
   { label: 'Settings', href: '/settings', icon: SettingsIcon, permission: '*' },
   { label: 'Products', href: '/products', icon: ShoppingBagIcon, permission: '*' },
   { label: 'Blog Posts', href: '/blog', icon: ArticleIcon, permission: '*' },
-  { label: 'Partner Logos', href: '/partners', icon: BusinessIcon, permission: '*' },
+  // { label: 'Partner Logos', href: '/partners', icon: BusinessIcon, permission: '*' },
 ];
 
 export default function AdminLayout({ children }) {
