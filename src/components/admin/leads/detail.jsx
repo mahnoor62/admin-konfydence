@@ -49,6 +49,8 @@ import {
   Download,
   Business,
   Gavel,
+  Visibility,
+  Info,
 } from '@mui/icons-material';
 import axios from 'axios';
 
@@ -97,6 +99,7 @@ export default function LeadDetail() {
   const [editQuoteStatusOpen, setEditQuoteStatusOpen] = useState(false);
   const [complianceTags, setComplianceTags] = useState([]);
   const [evidenceDialogOpen, setEvidenceDialogOpen] = useState(false);
+  const [viewDetailsOpen, setViewDetailsOpen] = useState(false);
   const [evidenceData, setEvidenceData] = useState({
     engagementEvidence: '',
     evidenceDate: '',
@@ -545,7 +548,18 @@ export default function LeadDetail() {
                     <Typography variant="caption" color="text.secondary">
                       Name
                     </Typography>
-                    <Typography variant="body1">{lead.name}</Typography>
+                    <Box display="flex" alignItems="center" gap={1}>
+                      <Typography variant="body1">{lead.name}</Typography>
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        startIcon={<Visibility />}
+                        onClick={() => setViewDetailsOpen(true)}
+                        sx={{ ml: 1 }}
+                      >
+                        View Details
+                      </Button>
+                    </Box>
                   </Grid>
                   <Grid item xs={12} md={6}>
                     <Typography variant="caption" color="text.secondary">
@@ -566,7 +580,10 @@ export default function LeadDetail() {
                       Segment
                     </Typography>
                     <Box mt={1}>
-                      <Chip label={lead.segment} size="small" />
+                      <Chip 
+                        label={lead.source === 'contact_form' ? (lead.topic || 'N/A') : (lead.segment || 'N/A')} 
+                        size="small" 
+                      />
                     </Box>
                   </Grid>
                   <Grid item xs={6}>
@@ -585,17 +602,7 @@ export default function LeadDetail() {
                       {new Date(lead.createdAt).toLocaleDateString()}
                     </Typography>
                   </Grid>
-                  {lead.source === 'b2e_form' && lead.studentStaffSize && (
-                    <Grid item xs={12}>
-                      <Typography variant="caption" color="text.secondary">
-                        Student/Staff Size
-                      </Typography>
-                      <Typography variant="body1">
-                        {lead.studentStaffSize}
-                      </Typography>
-                    </Grid>
-                  )}
-                  {lead.source === 'b2b_form' && lead.teamSize && (
+                  {lead.teamSize && (
                     <Grid item xs={12}>
                       <Typography variant="caption" color="text.secondary">
                         Team Size
@@ -1335,6 +1342,374 @@ export default function LeadDetail() {
             startIcon={convertLoading ? <CircularProgress size={20} color="inherit" /> : null}
           >
             {convertLoading ? 'Converting...' : 'Convert'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* View Details Dialog */}
+      <Dialog
+        open={viewDetailsOpen}
+        onClose={() => setViewDetailsOpen(false)}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle sx={{ pb: 1, fontSize: '1.25rem', fontWeight: 600 }}>
+          <Box display="flex" justifyContent="space-between" alignItems="center">
+            <Typography variant="h6">Lead Contact Details</Typography>
+            <IconButton size="small" onClick={() => setViewDetailsOpen(false)}>
+              <Cancel />
+            </IconButton>
+          </Box>
+        </DialogTitle>
+        <DialogContent sx={{ pt: 2, pb: 2 }}>
+          {lead && (
+            <Grid container spacing={3}>
+              {/* Basic Information */}
+              <Grid item xs={12}>
+                <Typography variant="subtitle1" fontWeight={600} gutterBottom>
+                  Basic Information
+                </Typography>
+                <Divider sx={{ mb: 2 }} />
+              </Grid>
+              
+              <Grid item xs={12} sm={6}>
+                <Typography variant="caption" color="text.secondary">
+                  Name
+                </Typography>
+                <Typography variant="body1">{lead.name || 'N/A'}</Typography>
+              </Grid>
+              
+              <Grid item xs={12} sm={6}>
+                <Typography variant="caption" color="text.secondary">
+                  Email
+                </Typography>
+                <Typography variant="body1" sx={{ wordBreak: 'break-word' }}>
+                  {lead.email || 'N/A'}
+                </Typography>
+              </Grid>
+              
+              <Grid item xs={12} sm={6}>
+                <Typography variant="caption" color="text.secondary">
+                  Organization
+                </Typography>
+                <Typography variant="body1">
+                  {lead.organizationName || 'N/A'}
+                </Typography>
+              </Grid>
+              
+              <Grid item xs={12} sm={6}>
+                <Typography variant="caption" color="text.secondary">
+                  Topic
+                </Typography>
+                <Typography variant="body1">
+                  {lead.topic || 'N/A'}
+                </Typography>
+              </Grid>
+
+              {/* Show fields based on source */}
+              {lead.source === 'contact_form' && (
+                <>
+                  {/* Address Information - Only for contact_form (demo options) */}
+                  {(lead.address || lead.city || lead.state || lead.country || lead.phone || lead.department || lead.position || lead.website) && (
+                    <>
+                      <Grid item xs={12}>
+                        <Typography variant="subtitle1" fontWeight={600} gutterBottom sx={{ mt: 2 }}>
+                          Address Information
+                        </Typography>
+                        <Divider sx={{ mb: 2 }} />
+                      </Grid>
+                      
+                      {lead.address && (
+                        <Grid item xs={12}>
+                          <Typography variant="caption" color="text.secondary">
+                            Address
+                          </Typography>
+                          <Typography variant="body1">
+                            {lead.address}
+                          </Typography>
+                        </Grid>
+                      )}
+                      
+                      {lead.city && (
+                        <Grid item xs={12} sm={4}>
+                          <Typography variant="caption" color="text.secondary">
+                            City
+                          </Typography>
+                          <Typography variant="body1">
+                            {lead.city}
+                          </Typography>
+                        </Grid>
+                      )}
+                      
+                      {lead.state && (
+                        <Grid item xs={12} sm={4}>
+                          <Typography variant="caption" color="text.secondary">
+                            State
+                          </Typography>
+                          <Typography variant="body1">
+                            {lead.state}
+                          </Typography>
+                        </Grid>
+                      )}
+                      
+                      {lead.country && (
+                        <Grid item xs={12} sm={4}>
+                          <Typography variant="caption" color="text.secondary">
+                            Country
+                          </Typography>
+                          <Typography variant="body1">
+                            {lead.country}
+                          </Typography>
+                        </Grid>
+                      )}
+                      
+                      {lead.phone && (
+                        <Grid item xs={12} sm={6}>
+                          <Typography variant="caption" color="text.secondary">
+                            Phone Number
+                          </Typography>
+                          <Typography variant="body1">
+                            {lead.phone}
+                          </Typography>
+                        </Grid>
+                      )}
+                      
+                      {lead.website && (
+                        <Grid item xs={12} sm={6}>
+                          <Typography variant="caption" color="text.secondary">
+                            Website
+                          </Typography>
+                          <Typography variant="body1" sx={{ wordBreak: 'break-word' }}>
+                            {lead.website}
+                          </Typography>
+                        </Grid>
+                      )}
+                      
+                      {lead.department && (
+                        <Grid item xs={12} sm={6}>
+                          <Typography variant="caption" color="text.secondary">
+                            Department
+                          </Typography>
+                          <Typography variant="body1">
+                            {lead.department}
+                          </Typography>
+                        </Grid>
+                      )}
+                      
+                      {lead.position && (
+                        <Grid item xs={12} sm={6}>
+                          <Typography variant="caption" color="text.secondary">
+                            Position
+                          </Typography>
+                          <Typography variant="body1">
+                            {lead.position}
+                          </Typography>
+                        </Grid>
+                      )}
+                    </>
+                  )}
+                </>
+              )}
+
+              {/* B2B Form Fields (CoMaSi) */}
+              {lead.source === 'b2b_form' && (
+                <>
+                  {/* Address Information for B2B Form */}
+                  {(lead.address || lead.city || lead.state || lead.country || lead.phone || lead.department || lead.position || lead.website) && (
+                    <>
+                      <Grid item xs={12}>
+                        <Typography variant="subtitle1" fontWeight={600} gutterBottom sx={{ mt: 2 }}>
+                          Address Information
+                        </Typography>
+                        <Divider sx={{ mb: 2 }} />
+                      </Grid>
+                      
+                      {lead.address && (
+                        <Grid item xs={12}>
+                          <Typography variant="caption" color="text.secondary">
+                            Address
+                          </Typography>
+                          <Typography variant="body1">
+                            {lead.address}
+                          </Typography>
+                        </Grid>
+                      )}
+                      
+                      {lead.city && (
+                        <Grid item xs={12} sm={4}>
+                          <Typography variant="caption" color="text.secondary">
+                            City
+                          </Typography>
+                          <Typography variant="body1">
+                            {lead.city}
+                          </Typography>
+                        </Grid>
+                      )}
+                      
+                      {lead.state && (
+                        <Grid item xs={12} sm={4}>
+                          <Typography variant="caption" color="text.secondary">
+                            State
+                          </Typography>
+                          <Typography variant="body1">
+                            {lead.state}
+                          </Typography>
+                        </Grid>
+                      )}
+                      
+                      {lead.country && (
+                        <Grid item xs={12} sm={4}>
+                          <Typography variant="caption" color="text.secondary">
+                            Country
+                          </Typography>
+                          <Typography variant="body1">
+                            {lead.country}
+                          </Typography>
+                        </Grid>
+                      )}
+                      
+                      {lead.phone && (
+                        <Grid item xs={12} sm={6}>
+                          <Typography variant="caption" color="text.secondary">
+                            Phone Number
+                          </Typography>
+                          <Typography variant="body1">
+                            {lead.phone}
+                          </Typography>
+                        </Grid>
+                      )}
+                      
+                      {lead.website && (
+                        <Grid item xs={12} sm={6}>
+                          <Typography variant="caption" color="text.secondary">
+                            Website
+                          </Typography>
+                          <Typography variant="body1" sx={{ wordBreak: 'break-word' }}>
+                            {lead.website}
+                          </Typography>
+                        </Grid>
+                      )}
+                      
+                      {lead.department && (
+                        <Grid item xs={12} sm={6}>
+                          <Typography variant="caption" color="text.secondary">
+                            Department
+                          </Typography>
+                          <Typography variant="body1">
+                            {lead.department}
+                          </Typography>
+                        </Grid>
+                      )}
+                      
+                      {lead.position && (
+                        <Grid item xs={12} sm={6}>
+                          <Typography variant="caption" color="text.secondary">
+                            Position
+                          </Typography>
+                          <Typography variant="body1">
+                            {lead.position}
+                          </Typography>
+                        </Grid>
+                      )}
+                    </>
+                  )}
+                  
+                  {/* Company Information */}
+                  {lead.teamSize && (
+                    <>
+                      <Grid item xs={12}>
+                        <Typography variant="subtitle1" fontWeight={600} gutterBottom sx={{ mt: 2 }}>
+                          Company Information
+                        </Typography>
+                        <Divider sx={{ mb: 2 }} />
+                      </Grid>
+                      <Grid item xs={12} sm={6}>
+                        <Typography variant="caption" color="text.secondary">
+                          Team Size
+                        </Typography>
+                        <Typography variant="body1">
+                          {lead.teamSize}
+                        </Typography>
+                      </Grid>
+                    </>
+                  )}
+                </>
+              )}
+
+              {/* B2E Form Fields (Education) */}
+              {lead.source === 'b2e_form' && lead.studentStaffSize && (
+                <>
+                  <Grid item xs={12}>
+                    <Typography variant="subtitle1" fontWeight={600} gutterBottom sx={{ mt: 2 }}>
+                      Institution Information
+                    </Typography>
+                    <Divider sx={{ mb: 2 }} />
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <Typography variant="caption" color="text.secondary">
+                      Student/Staff Size
+                    </Typography>
+                    <Typography variant="body1">
+                      {lead.studentStaffSize}
+                    </Typography>
+                  </Grid>
+                </>
+              )}
+
+              {/* Additional Information */}
+              <Grid item xs={12}>
+                <Typography variant="subtitle1" fontWeight={600} gutterBottom sx={{ mt: 2 }}>
+                  Additional Information
+                </Typography>
+                <Divider sx={{ mb: 2 }} />
+              </Grid>
+              
+              {lead.message && (
+                <Grid item xs={12}>
+                  <Typography variant="caption" color="text.secondary">
+                    Message
+                  </Typography>
+                  <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', mt: 1 }}>
+                    {lead.message}
+                  </Typography>
+                </Grid>
+              )}
+              
+              <Grid item xs={12} sm={6}>
+                <Typography variant="caption" color="text.secondary">
+                  Segment
+                </Typography>
+                <Box mt={1}>
+                  <Chip 
+                    label={lead.source === 'contact_form' ? (lead.topic || 'N/A') : (lead.segment || 'N/A')} 
+                    size="small" 
+                  />
+                </Box>
+              </Grid>
+              
+              <Grid item xs={12} sm={6}>
+                <Typography variant="caption" color="text.secondary">
+                  Source
+                </Typography>
+                <Typography variant="body1">
+                  {lead.source ? lead.source.replace('_', ' ').toUpperCase() : 'N/A'}
+                </Typography>
+              </Grid>
+              
+              <Grid item xs={12} sm={6}>
+                <Typography variant="caption" color="text.secondary">
+                  Created At
+                </Typography>
+                <Typography variant="body1">
+                  {lead.createdAt ? new Date(lead.createdAt).toLocaleString() : 'N/A'}
+                </Typography>
+              </Grid>
+            </Grid>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setViewDetailsOpen(false)} variant="contained">
+            Close
           </Button>
         </DialogActions>
       </Dialog>

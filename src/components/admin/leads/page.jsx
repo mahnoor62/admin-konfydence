@@ -590,8 +590,8 @@ export default function Leads() {
                   <TableCell>{lead.organizationName || 'N/A'}</TableCell>
                   <TableCell>
                     <Chip 
-                      label={lead.segment}
-                      color={lead.segment === 'B2B' ? 'primary' : lead.segment === 'B2E' ? 'info' : 'default'}
+                      label={lead.source === 'contact_form' ? (lead.topic || 'N/A') : (lead.segment || 'N/A')}
+                      color={lead.source === 'contact_form' ? 'default' : (lead.segment === 'B2B' ? 'primary' : lead.segment === 'B2E' ? 'info' : 'default')}
                       size="small"
                     />
                   </TableCell>
@@ -717,6 +717,150 @@ export default function Leads() {
                   <MenuItem value="lost">Lost</MenuItem>
                 </TextField>
               </Grid>
+              
+              {/* Demo Request Additional Fields */}
+              {(selectedLead.department || selectedLead.position || selectedLead.address || selectedLead.city || selectedLead.state || selectedLead.country || selectedLead.phone || selectedLead.website || selectedLead.teamSize || selectedLead.studentStaffSize) && (
+                <>
+                  <Grid item xs={12}>
+                    <Typography variant="subtitle2" color="text.secondary" gutterBottom sx={{ mt: 2 }}>
+                      DEMO REQUEST DETAILS
+                    </Typography>
+                    <Divider sx={{ mb: 2 }} />
+                  </Grid>
+                  {selectedLead.department && (
+                    <Grid item xs={12} sm={6}>
+                      <TextField
+                        fullWidth
+                        label="Department"
+                        value={selectedLead.department || ''}
+                        onChange={(e) => handleUpdateLead('department', e.target.value)}
+                      />
+                    </Grid>
+                  )}
+                  {selectedLead.position && (
+                    <Grid item xs={12} sm={6}>
+                      <TextField
+                        fullWidth
+                        label="Position"
+                        value={selectedLead.position || ''}
+                        onChange={(e) => handleUpdateLead('position', e.target.value)}
+                      />
+                    </Grid>
+                  )}
+                  {selectedLead.address && (
+                    <Grid item xs={12}>
+                      <TextField
+                        fullWidth
+                        label="Street Address"
+                        value={selectedLead.address || ''}
+                        onChange={(e) => handleUpdateLead('address', e.target.value)}
+                      />
+                    </Grid>
+                  )}
+                  {selectedLead.city && (
+                    <Grid item xs={12} sm={4}>
+                      <TextField
+                        fullWidth
+                        label="City"
+                        value={selectedLead.city || ''}
+                        onChange={(e) => handleUpdateLead('city', e.target.value)}
+                      />
+                    </Grid>
+                  )}
+                  {selectedLead.state && (
+                    <Grid item xs={12} sm={4}>
+                      <TextField
+                        fullWidth
+                        label="State / Province"
+                        value={selectedLead.state || ''}
+                        onChange={(e) => handleUpdateLead('state', e.target.value)}
+                      />
+                    </Grid>
+                  )}
+                  {selectedLead.country && (
+                    <Grid item xs={12} sm={4}>
+                      <TextField
+                        fullWidth
+                        label="Country"
+                        value={selectedLead.country || ''}
+                        onChange={(e) => handleUpdateLead('country', e.target.value)}
+                      />
+                    </Grid>
+                  )}
+                  {selectedLead.phone && (
+                    <Grid item xs={12} sm={6}>
+                      <TextField
+                        fullWidth
+                        label="Phone Number"
+                        value={selectedLead.phone || ''}
+                        onChange={(e) => handleUpdateLead('phone', e.target.value)}
+                      />
+                    </Grid>
+                  )}
+                  {selectedLead.website && (
+                    <Grid item xs={12} sm={6}>
+                      <TextField
+                        fullWidth
+                        label="Website"
+                        value={selectedLead.website || ''}
+                        onChange={(e) => handleUpdateLead('website', e.target.value)}
+                      />
+                    </Grid>
+                  )}
+                  {selectedLead.teamSize && (
+                    <Grid item xs={12} sm={6}>
+                      <TextField
+                        fullWidth
+                        label="Team Size"
+                        value={selectedLead.teamSize || ''}
+                        onChange={(e) => handleUpdateLead('teamSize', e.target.value)}
+                      />
+                    </Grid>
+                  )}
+                  {selectedLead.studentStaffSize && (
+                    <Grid item xs={12} sm={6}>
+                      <TextField
+                        fullWidth
+                        label="Student/Staff Size"
+                        value={selectedLead.studentStaffSize || ''}
+                        onChange={(e) => handleUpdateLead('studentStaffSize', e.target.value)}
+                      />
+                    </Grid>
+                  )}
+                </>
+              )}
+              
+              {/* Topic and Message */}
+              {selectedLead.topic && (
+                <Grid item xs={12}>
+                  <Typography variant="subtitle2" color="text.secondary" gutterBottom sx={{ mt: 2 }}>
+                    CONTACT FORM DETAILS
+                  </Typography>
+                  <Divider sx={{ mb: 2 }} />
+                </Grid>
+              )}
+              {selectedLead.topic && (
+                <Grid item xs={12} sm={6}>
+                  <TextField
+                    fullWidth
+                    label="Topic"
+                    value={selectedLead.topic || ''}
+                    disabled
+                  />
+                </Grid>
+              )}
+              {selectedLead.message && (
+                <Grid item xs={12}>
+                  <TextField
+                    fullWidth
+                    label="Message"
+                    multiline
+                    rows={4}
+                    value={selectedLead.message || ''}
+                    disabled
+                  />
+                </Grid>
+              )}
 
               {/* Engagement Tracking */}
               <Grid item xs={12}>
