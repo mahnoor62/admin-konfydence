@@ -852,6 +852,7 @@ function BlogContent() {
     featuredImage: '',
     category: 'news',
     isPublished: false,
+    publishedAt: '',
   });
   const [snackbar, setSnackbar] = useState({
     open: false,
@@ -926,6 +927,10 @@ function BlogContent() {
   const handleOpen = (post) => {
     if (post) {
       setEditing(post);
+      // Format publishedAt date for date input (YYYY-MM-DD)
+      const publishedAtDate = post.publishedAt 
+        ? new Date(post.publishedAt).toISOString().split('T')[0]
+        : '';
       setFormData({
         title: post.title,
         excerpt: post.excerpt,
@@ -933,6 +938,7 @@ function BlogContent() {
         featuredImage: post.featuredImage || '',
         category: post.category || 'news',
         isPublished: post.isPublished,
+        publishedAt: publishedAtDate,
       });
     } else {
       setEditing(null);
@@ -943,6 +949,7 @@ function BlogContent() {
         featuredImage: '',
         category: 'news',
         isPublished: false,
+        publishedAt: '',
       });
     }
     setOpen(true);
@@ -990,9 +997,23 @@ function BlogContent() {
         return;
       }
 
+      // Handle publishedAt: use the selected date if provided, otherwise set to current date if publishing
+      let publishedAtValue = undefined;
+      if (formData.isPublished) {
+        if (formData.publishedAt) {
+          // If date is provided, set time to start of day in UTC
+          const date = new Date(formData.publishedAt);
+          date.setHours(0, 0, 0, 0);
+          publishedAtValue = date.toISOString();
+        } else {
+          // If no date provided but isPublished is true, use current date
+          publishedAtValue = new Date().toISOString();
+        }
+      }
+
       const payload = {
         ...formData,
-        publishedAt: formData.isPublished ? new Date().toISOString() : undefined,
+        publishedAt: publishedAtValue,
       };
 
       const headers = getAuthHeaders();
@@ -1425,12 +1446,42 @@ function BlogContent() {
                     setFormData({
                       ...formData,
                       isPublished: e.target.checked,
+                      // Auto-set publishedAt to today if enabling publish and no date set
+                      publishedAt: e.target.checked && !formData.publishedAt 
+                        ? new Date().toISOString().split('T')[0]
+                        : e.target.checked && formData.publishedAt && new Date(formData.publishedAt).getFullYear() > 2025
+                        ? new Date().toISOString().split('T')[0]
+                        : formData.publishedAt,
                     })
                   }
                 />
               }
               label="Published"
             />
+            
+            {/* Publish Date Field */}
+            {formData.isPublished && (
+              <TextField
+                label="Publish Date"
+                type="date"
+                fullWidth
+                value={formData.publishedAt}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    publishedAt: e.target.value,
+                  })
+                }
+                InputLabelProps={{
+                  shrink: true,
+                }}
+                inputProps={{
+                  min: new Date().getFullYear() + '-01-01',
+                  max: '2099-12-31',
+                }}
+                helperText="Select the date when this blog should be published on the website"
+              />
+            )}
           </Box>
         </DialogContent>
         <DialogActions>
