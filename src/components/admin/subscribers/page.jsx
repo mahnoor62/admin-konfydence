@@ -20,10 +20,19 @@ import {
   Stack,
   Tabs,
   Tab,
+  IconButton,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogContentText,
+  DialogActions,
+  Button,
+  Snackbar,
 } from '@mui/material';
 import {
   Search,
   Email,
+  Delete as DeleteIcon,
 } from '@mui/icons-material';
 import axios from 'axios';
 
@@ -64,6 +73,14 @@ export default function Subscribers() {
     limit: 50,
     total: 0,
     pages: 0,
+  });
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [subscriberToDelete, setSubscriberToDelete] = useState(null);
+  const [deleting, setDeleting] = useState(false);
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: '',
+    severity: 'success',
   });
 
   const subscriptionTypes = [
@@ -144,6 +161,48 @@ export default function Subscribers() {
     }
   };
 
+  const handleDeleteClick = (subscriber) => {
+    setSubscriberToDelete(subscriber);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!subscriberToDelete) return;
+
+    try {
+      setDeleting(true);
+      const api = getApiInstance();
+      await api.delete(`/subscribers/${subscriberToDelete._id}`);
+      
+      setSnackbar({
+        open: true,
+        message: 'Subscriber deleted successfully',
+        severity: 'success',
+      });
+      setDeleteDialogOpen(false);
+      setSubscriberToDelete(null);
+      await fetchSubscribers();
+    } catch (err) {
+      console.error('Error deleting subscriber:', err);
+      setSnackbar({
+        open: true,
+        message: err.response?.data?.message || 'Failed to delete subscriber',
+        severity: 'error',
+      });
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const handleDeleteCancel = () => {
+    setDeleteDialogOpen(false);
+    setSubscriberToDelete(null);
+  };
+
+  const handleCloseSnackbar = () => {
+    setSnackbar({ ...snackbar, open: false });
+  };
+
   return (
     <Box sx={{ p: 3 }}>
       <Box sx={{ mb: 4 }}>
@@ -210,12 +269,13 @@ export default function Subscribers() {
                   <TableCell sx={{ fontWeight: 600 }}>Subscription Type</TableCell>
                   <TableCell sx={{ fontWeight: 600 }}>Source</TableCell>
                   <TableCell sx={{ fontWeight: 600 }}>Subscribed At</TableCell>
+                  <TableCell sx={{ fontWeight: 600 }}>Actions</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {filteredSubscribers.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={4} align="center" sx={{ py: 4 }}>
+                    <TableCell colSpan={5} align="center" sx={{ py: 4 }}>
                       <Typography variant="body2" color="text.secondary">
                         {searchQuery ? 'No subscribers found matching your search.' : 'No subscribers yet.'}
                       </Typography>
@@ -279,6 +339,16 @@ export default function Subscribers() {
                             {formatDate(subscriber.subscribedAt)}
                           </Typography>
                         </TableCell>
+                        <TableCell>
+                          <IconButton
+                            size="small"
+                            color="error"
+                            onClick={() => handleDeleteClick(subscriber)}
+                            aria-label="delete subscriber"
+                          >
+                            <DeleteIcon fontSize="small" />
+                          </IconButton>
+                        </TableCell>
                       </TableRow>
                     );
                   })
@@ -309,6 +379,44 @@ export default function Subscribers() {
           </Box>
         </>
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteDialogOpen} onClose={handleDeleteCancel} maxWidth="sm" fullWidth>
+        <DialogTitle>Delete Subscriber</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Are you sure you want to delete the subscription for <strong>{subscriberToDelete?.email}</strong>?
+            <br />
+            <br />
+            {/* Subscription Type: <strong>{subscriberToDelete?.subscriptionType ? 
+              subscriptionTypes.find(t => t.value === subscriberToDelete.subscriptionType)?.label || subscriberToDelete.subscriptionType 
+              : 'N/A'}</strong>
+            <br />
+            <br />
+            This action cannot be undone. */}
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleDeleteCancel} disabled={deleting}>
+            Cancel
+          </Button>
+          <Button onClick={handleDeleteConfirm} color="error" variant="contained" disabled={deleting}>
+            {deleting ? 'Deleting...' : 'Delete'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Snackbar for notifications */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={handleCloseSnackbar}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert onClose={handleCloseSnackbar} severity={snackbar.severity} sx={{ width: '100%' }}>
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }
