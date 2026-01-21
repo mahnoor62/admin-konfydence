@@ -204,8 +204,8 @@ export default function Sales() {
     fetchData();
   }, [typeFilter, tabValue, fetchData]);
 
-  const handleOpenDelete = (item, isContract = false) => {
-    setItemToDelete({ ...item, isContract });
+  const handleOpenDelete = (item, isContract = false, isMembership = false) => {
+    setItemToDelete({ ...item, isContract, isMembership });
     setDeleteDialogOpen(true);
   };
 
@@ -218,14 +218,18 @@ export default function Sales() {
     if (!itemToDelete) return;
 
     try {
+      const api = getApiInstance();
+      
       if (itemToDelete.isContract) {
         setIsDeletingContract(true);
-        const api = getApiInstance();
         // Delete custom package
         await api.delete(`/custom-packages/${itemToDelete._id}`);
+      } else if (itemToDelete.isMembership) {
+        setDeleting(true);
+        // Delete membership - _id is the user's ID
+        await api.delete(`/users/${itemToDelete._id}/membership`);
       } else {
         setDeleting(true);
-        const api = getApiInstance();
         // Delete transaction
         await api.delete(`/transactions/${itemToDelete._id}`);
       }
@@ -544,7 +548,7 @@ export default function Sales() {
                   <TableCell>Status</TableCell>
                   <TableCell>Start Date</TableCell>
                   <TableCell>End Date</TableCell>
-                  <TableCell>Created At</TableCell>
+                  <TableCell>Actions</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -589,7 +593,14 @@ export default function Sales() {
                         {membership.endDate ? new Date(membership.endDate).toLocaleDateString() : 'N/A'}
                       </TableCell>
                       <TableCell>
-                        {membership.createdAt ? new Date(membership.createdAt).toLocaleDateString() : 'N/A'}
+                        <IconButton 
+                          size="small" 
+                          onClick={() => handleOpenDelete(membership, false, true)} 
+                          color="error"
+                          title="Delete Membership"
+                        >
+                          <DeleteIcon />
+                        </IconButton>
                       </TableCell>
                   </TableRow>
                 ))
@@ -600,16 +611,33 @@ export default function Sales() {
       )}
 
       <Dialog open={deleteDialogOpen} onClose={handleCloseDelete} maxWidth="sm" fullWidth>
-        <DialogTitle>Delete {itemToDelete?.isContract ? 'Contract' : 'Transaction'}</DialogTitle>
+        <DialogTitle>
+          Delete {itemToDelete?.isContract ? 'Contract' : itemToDelete?.isMembership ? 'Membership' : 'Transaction'}
+        </DialogTitle>
         <DialogContent>
           <DialogContentText>
-            Are you sure you want to delete this {itemToDelete?.isContract ? 'contract' : 'transaction'}? 
+            Are you sure you want to delete this {itemToDelete?.isContract ? 'contract' : itemToDelete?.isMembership ? 'membership' : 'transaction'}? 
             This action cannot be undone.
             {itemToDelete?.isContract && (
               <>
                 <br />
                 <br />
                 This will also delete the custom package associated with this contract.
+              </>
+            )}
+            {itemToDelete?.isMembership && (
+              <>
+                <br />
+                <br />
+                <strong>Membership Details:</strong>
+                <br />
+                User: {itemToDelete?.userName || 'N/A'}
+                <br />
+                Email: {itemToDelete?.userEmail || 'N/A'}
+                <br />
+                Package: {itemToDelete?.packageName || 'N/A'}
+                <br />
+                Type: {itemToDelete?.membershipType?.toUpperCase() || 'N/A'}
               </>
             )}
           </DialogContentText>

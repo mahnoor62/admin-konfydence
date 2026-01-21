@@ -1094,8 +1094,8 @@ export default function CustomPackageRequests() {
                         expiryTimeUnit: e.target.value 
                       })}
                     >
-                      <MenuItem value="">None</MenuItem>
-                      <MenuItem value="months">Months</MenuItem>
+                      {/* <MenuItem value="">None</MenuItem>
+                      <MenuItem value="months">Months</MenuItem> */}
                       <MenuItem value="years">Years</MenuItem>
                     </Select>
                   </FormControl>
