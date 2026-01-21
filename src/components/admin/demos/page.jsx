@@ -15,7 +15,15 @@ import {
   CircularProgress,
   Alert,
   LinearProgress,
+  IconButton,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogContentText,
+  DialogActions,
+  Button,
 } from '@mui/material';
+import DeleteIcon from '@mui/icons-material/Delete';
 import axios from 'axios';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
@@ -47,6 +55,9 @@ export default function Demos() {
   const [trials, setTrials] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [trialToDelete, setTrialToDelete] = useState(null);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     fetchTrials();
@@ -92,6 +103,35 @@ export default function Demos() {
     }
   };
 
+  const handleOpenDelete = (trial) => {
+    setTrialToDelete(trial);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleCloseDelete = () => {
+    setDeleteDialogOpen(false);
+    setTrialToDelete(null);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!trialToDelete) return;
+
+    try {
+      setDeleting(true);
+      const api = getApiInstance();
+      await api.delete(`/free-trial/${trialToDelete._id}`);
+      
+      fetchTrials();
+      handleCloseDelete();
+      setError(null);
+    } catch (err) {
+      console.error('Error deleting trial:', err);
+      setError(err.response?.data?.error || 'Failed to delete trial');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   if (loading) {
     return (
       <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
@@ -124,12 +164,13 @@ export default function Demos() {
               <TableCell>Seats Used</TableCell>
               <TableCell>Start Date</TableCell>
               <TableCell>End Date</TableCell>
+              <TableCell align="right">Actions</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {trials.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} align="center">
+                <TableCell colSpan={9} align="center">
                   <Typography color="text.secondary">No trials found</Typography>
                 </TableCell>
               </TableRow>
@@ -187,6 +228,16 @@ export default function Demos() {
                     <TableCell>
                       {trial.endDate ? new Date(trial.endDate).toLocaleDateString() : 'N/A'}
                     </TableCell>
+                    <TableCell align="right">
+                      <IconButton 
+                        size="small" 
+                        onClick={() => handleOpenDelete(trial)}
+                        color="error"
+                        title="Delete Trial"
+                      >
+                        <DeleteIcon />
+                      </IconButton>
+                    </TableCell>
                   </TableRow>
                 );
               })
@@ -194,6 +245,42 @@ export default function Demos() {
           </TableBody>
         </Table>
       </TableContainer>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteDialogOpen} onClose={handleCloseDelete} maxWidth="sm" fullWidth>
+        <DialogTitle>Delete Trial</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Are you sure you want to delete this trial? This action cannot be undone.
+            {trialToDelete && (
+              <>
+                <br />
+                <br />
+                <strong>Trial Details:</strong>
+                <br />
+                User/Organization: {trialToDelete.organizationId?.name || trialToDelete.userId?.name || trialToDelete.userId?.email || 'N/A'}
+                <br />
+                Package: {trialToDelete.packageId?.name || 'N/A'}
+                <br />
+                Unique Code: {trialToDelete.uniqueCode || 'N/A'}
+              </>
+            )}
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseDelete} disabled={deleting}>
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleConfirmDelete} 
+            color="error" 
+            variant="contained" 
+            disabled={deleting}
+          >
+            {deleting ? 'Deleting...' : 'Delete'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

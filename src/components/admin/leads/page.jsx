@@ -45,6 +45,7 @@ import {
   NewReleases,
   AttachMoney,
   PlayArrow,
+  Delete as DeleteIcon,
 } from '@mui/icons-material';
 import axios from 'axios';
 
@@ -85,6 +86,9 @@ export default function Leads() {
   const [segmentFilter, setSegmentFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [noteText, setNoteText] = useState('');
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [leadToDelete, setLeadToDelete] = useState(null);
+  const [deleting, setDeleting] = useState(false);
   const [convertForm, setConvertForm] = useState({
     name: '',
     type: '',
@@ -253,6 +257,36 @@ export default function Leads() {
     } catch (err) {
       console.error('Error converting lead:', err);
       setError(err.response?.data?.error || 'Failed to convert lead');
+    }
+  };
+
+  const handleOpenDelete = (e, lead) => {
+    e.stopPropagation(); // Prevent row click
+    setLeadToDelete(lead);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleCloseDelete = () => {
+    setDeleteDialogOpen(false);
+    setLeadToDelete(null);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!leadToDelete) return;
+
+    try {
+      setDeleting(true);
+      const api = getApiInstance();
+      await api.delete(`/leads/unified/${leadToDelete._id}`);
+      
+      fetchLeads();
+      handleCloseDelete();
+      setError(null);
+    } catch (err) {
+      console.error('Error deleting lead:', err);
+      setError(err.response?.data?.error || 'Failed to delete lead');
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -639,8 +673,16 @@ export default function Leads() {
                     {new Date(lead.createdAt).toLocaleDateString()}
                   </TableCell>
                   <TableCell>
-                    <IconButton size="small" onClick={() => handleViewDetail(lead._id)}>
+                    <IconButton size="small" onClick={(e) => { e.stopPropagation(); handleViewDetail(lead._id); }}>
                       <Visibility />
+                    </IconButton>
+                    <IconButton 
+                      size="small" 
+                      onClick={(e) => handleOpenDelete(e, lead)}
+                      color="error"
+                      title="Delete Lead"
+                    >
+                      <DeleteIcon />
                     </IconButton>
                   </TableCell>
                 </TableRow>
@@ -1154,6 +1196,50 @@ export default function Leads() {
             disabled={!convertForm.name || !convertForm.type || !convertForm.segment || !convertForm.primaryContact.name || !convertForm.primaryContact.email}
           >
             Convert
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteDialogOpen} onClose={handleCloseDelete} maxWidth="sm" fullWidth>
+        <DialogTitle>Delete Lead</DialogTitle>
+        <DialogContent>
+          <Typography>
+            Are you sure you want to delete this lead? This action cannot be undone.
+          </Typography>
+          {leadToDelete && (
+            <Box sx={{ mt: 2, p: 2, bgcolor: 'grey.100', borderRadius: 1 }}>
+              <Typography variant="body2">
+                <strong>Lead Details:</strong>
+              </Typography>
+              <Typography variant="body2">
+                Name: {leadToDelete.name}
+              </Typography>
+              <Typography variant="body2">
+                Email: {leadToDelete.email}
+              </Typography>
+              {leadToDelete.organizationName && (
+                <Typography variant="body2">
+                  Organization: {leadToDelete.organizationName}
+                </Typography>
+              )}
+              <Typography variant="body2">
+                Status: {leadToDelete.status}
+              </Typography>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseDelete} disabled={deleting}>
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleConfirmDelete} 
+            color="error" 
+            variant="contained" 
+            disabled={deleting}
+          >
+            {deleting ? 'Deleting...' : 'Delete'}
           </Button>
         </DialogActions>
       </Dialog>
