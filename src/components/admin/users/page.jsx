@@ -185,7 +185,9 @@ export default function Users() {
                     <TableCell>{user.email}</TableCell>
                     {tabValue !== 0 && (
                       <TableCell>
-                        {user.organizationName || user.organizationId?.name || 'N/A'}
+                        {tabValue === 2 
+                          ? (user.schoolId?.name || user.schoolName || 'N/A')
+                          : (user.organizationId?.name || user.organizationName || 'N/A')}
                       </TableCell>
                     )}
                     <TableCell>
