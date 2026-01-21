@@ -559,14 +559,14 @@ export default function Cards() {
                       >
                         <EditIcon />
                       </IconButton>
-                      <IconButton 
+                      {/* <IconButton 
                         size="small" 
                         onClick={() => handleDelete(card._id)}
                         color="error"
                         title="Delete"
                       >
                         <DeleteIcon />
-                      </IconButton>
+                      </IconButton> */}
                     </TableCell>
                   </TableRow>
                 );
