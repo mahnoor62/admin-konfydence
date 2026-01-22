@@ -27,6 +27,7 @@ import {
   Snackbar,
   FormControlLabel,
   Switch,
+  InputAdornment,
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -34,6 +35,7 @@ import AddIcon from '@mui/icons-material/Add';
 import AttachFileIcon from '@mui/icons-material/AttachFile';
 import CloseIcon from '@mui/icons-material/Close';
 import VisibilityIcon from '@mui/icons-material/Visibility';
+import SearchIcon from '@mui/icons-material/Search';
 import axios from 'axios';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
@@ -96,6 +98,7 @@ export default function Cards() {
   const [viewingCard, setViewingCard] = useState(null); // Card being viewed in view mode
   const [confirmDialog, setConfirmDialog] = useState({ open: false, title: '', message: '', onConfirm: null });
   const [successMessage, setSuccessMessage] = useState(null);
+  const [searchTerm, setSearchTerm] = useState(''); // Search filter state
 
   const formDataRef = useRef(formData);
   useEffect(() => {
@@ -484,6 +487,16 @@ export default function Cards() {
     );
   }
 
+  // Filter cards based on search term
+  const filteredCards = cards.filter(card => {
+    if (!searchTerm) return true;
+    const searchLower = searchTerm.toLowerCase();
+    return (
+      card.title?.toLowerCase().includes(searchLower) ||
+      card.category?.toLowerCase().includes(searchLower)
+    );
+  });
+
   return (
     <Box>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
@@ -495,6 +508,33 @@ export default function Cards() {
         >
           Create Card
         </Button>
+      </Box>
+
+      {/* Search Filter */}
+      <Box mb={2}>
+        <TextField
+          fullWidth
+          variant="outlined"
+          placeholder="Search cards by title..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          size="small"
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <SearchIcon color="action" />
+              </InputAdornment>
+            ),
+          }}
+          sx={{
+            backgroundColor: 'white',
+            '& .MuiOutlinedInput-root': {
+              '&:hover fieldset': {
+                borderColor: 'primary.main',
+              },
+            },
+          }}
+        />
       </Box>
 
       <TableContainer component={Paper}>
@@ -509,14 +549,16 @@ export default function Cards() {
             </TableRow>
           </TableHead>
           <TableBody>
-            {cards.length === 0 ? (
+            {filteredCards.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={5} align="center">
-                  <Typography color="text.secondary">No cards found</Typography>
+                  <Typography color="text.secondary">
+                    {searchTerm ? 'No cards match your search' : 'No cards found'}
+                  </Typography>
                 </TableCell>
               </TableRow>
             ) : (
-              cards.map((card) => {
+              filteredCards.map((card) => {
                 return (
                   <TableRow key={card._id}>
                     <TableCell>

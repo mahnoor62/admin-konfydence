@@ -769,6 +769,7 @@ import {
   Grid,
   Tabs,
   Tab,
+  Autocomplete,
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -2435,243 +2436,183 @@ function ProductsContent() {
                   </Typography>
                   <Grid container spacing={2}>
                     <Grid item xs={12} md={4}>
-                      <FormControl fullWidth>
-                        <InputLabel id="level1-label">Level 1 Cards</InputLabel>
-                        <Select
-                          labelId="level1-label"
-                          multiple
-                          value={formData.level1 || []}
-                          onChange={(e) =>
-                            setFormData({ ...formData, level1: e.target.value })
-                          }
-                          input={<OutlinedInput label="Level 1 Cards" />}
-                          renderValue={(selected) => (
-                            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                              {selected.length === 0 ? (
-                                <Typography variant="body2" color="text.secondary">
-                                  None
-                                </Typography>
-                              ) : (
-                                selected.map((cardId) => {
-                                  const card = allCards.find((c) => c._id === cardId);
-                                  return (
-                                    <Chip
-                                      key={cardId}
-                                      label={card?.title || cardId}
-                                      size="small"
-                                      sx={{
-                                        backgroundColor: 'rgba(11, 120, 151, 0.08)',
-                                        color: '#0B7897',
-                                        fontWeight: 500,
-                                      }}
-                                    />
-                                  );
-                                })
-                              )}
-                            </Box>
-                          )}
-                          disabled={loadingCards}
-                        >
-                          {loadingCards ? (
-                            <MenuItem disabled>
-                              <CircularProgress size={20} sx={{ mr: 1 }} />
-                              Loading...
-                            </MenuItem>
-                          ) : allCards.filter(card => {
-                            // Filter cards by target audience (multiple selection support)
-                            if (!card.targetAudiences || card.targetAudiences.length === 0) return false;
-                            const targetMap = {
-                              'private-users': 'B2C',
-                              'schools': 'B2E',
-                              'businesses': 'B2B'
-                            };
-                            const selectedTargets = Array.isArray(formData.targetAudience) ? formData.targetAudience : [formData.targetAudience];
-                            const targetValues = selectedTargets.map(ta => targetMap[ta]).filter(Boolean);
-                            return targetValues.some(tv => card.targetAudiences.includes(tv));
-                          }).length === 0 ? (
-                            <MenuItem disabled>No cards available for selected target audience(s)</MenuItem>
-                          ) : (
-                            allCards
-                              .filter(card => {
-                                // Filter cards by target audience (multiple selection support)
-                                if (!card.targetAudiences || card.targetAudiences.length === 0) return false;
-                                const targetMap = {
-                                  'private-users': 'B2C',
-                                  'schools': 'B2E',
-                                  'businesses': 'B2B'
-                                };
-                                const selectedTargets = Array.isArray(formData.targetAudience) ? formData.targetAudience : [formData.targetAudience];
-                                const targetValues = selectedTargets.map(ta => targetMap[ta]).filter(Boolean);
-                                return targetValues.some(tv => card.targetAudiences.includes(tv));
-                              })
-                              .map((card) => (
-                                <MenuItem key={card._id} value={card._id}>
-                                  {card.title || 'Untitled Card'}
-                                </MenuItem>
-                              ))
-                          )}
-                        </Select>
-                      </FormControl>
+                      <Autocomplete
+                        multiple
+                        options={allCards.filter(card => {
+                          // Filter cards by target audience
+                          if (!card.targetAudiences || card.targetAudiences.length === 0) return false;
+                          const targetMap = {
+                            'private-users': 'B2C',
+                            'schools': 'B2E',
+                            'businesses': 'B2B'
+                          };
+                          const selectedTargets = Array.isArray(formData.targetAudience) ? formData.targetAudience : [formData.targetAudience];
+                          const targetValues = selectedTargets.map(ta => targetMap[ta]).filter(Boolean);
+                          return targetValues.some(tv => card.targetAudiences.includes(tv));
+                        })}
+                        getOptionLabel={(option) => option.title || 'Untitled Card'}
+                        value={allCards.filter(card => (formData.level1 || []).includes(card._id))}
+                        onChange={(event, newValue) => {
+                          setFormData({ ...formData, level1: newValue.map(card => card._id) });
+                        }}
+                        disabled={loadingCards}
+                        disablePortal
+                        componentsProps={{
+                          popper: {
+                            placement: 'bottom-start',
+                            modifiers: [
+                              {
+                                name: 'flip',
+                                enabled: false,
+                              },
+                            ],
+                          },
+                        }}
+                        renderInput={(params) => (
+                          <TextField
+                            {...params}
+                            label="Level 1 Cards"
+                            placeholder="Search cards..."
+                          />
+                        )}
+                        renderTags={(value, getTagProps) =>
+                          value.map((option, index) => (
+                            <Chip
+                              {...getTagProps({ index })}
+                              key={option._id}
+                              label={option.title || 'Untitled Card'}
+                              size="small"
+                              sx={{
+                                backgroundColor: 'rgba(11, 120, 151, 0.08)',
+                                color: '#0B7897',
+                                fontWeight: 500,
+                              }}
+                            />
+                          ))
+                        }
+                        loading={loadingCards}
+                        noOptionsText="No cards available for selected target audience(s)"
+                      />
                     </Grid>
 
                     <Grid item xs={12} md={4}>
-                      <FormControl fullWidth>
-                        <InputLabel id="level2-label">Level 2 Cards</InputLabel>
-                        <Select
-                          labelId="level2-label"
-                          multiple
-                          value={formData.level2 || []}
-                          onChange={(e) =>
-                            setFormData({ ...formData, level2: e.target.value })
-                          }
-                          input={<OutlinedInput label="Level 2 Cards" />}
-                          renderValue={(selected) => (
-                            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                              {selected.length === 0 ? (
-                                <Typography variant="body2" color="text.secondary">
-                                  None
-                                </Typography>
-                              ) : (
-                                selected.map((cardId) => {
-                                  const card = allCards.find((c) => c._id === cardId);
-                                  return (
-                                    <Chip
-                                      key={cardId}
-                                      label={card?.title || cardId}
-                                      size="small"
-                                      sx={{
-                                        backgroundColor: 'rgba(11, 120, 151, 0.08)',
-                                        color: '#0B7897',
-                                        fontWeight: 500,
-                                      }}
-                                    />
-                                  );
-                                })
-                              )}
-                            </Box>
-                          )}
-                          disabled={loadingCards}
-                        >
-                          {loadingCards ? (
-                            <MenuItem disabled>
-                              <CircularProgress size={20} sx={{ mr: 1 }} />
-                              Loading...
-                            </MenuItem>
-                          ) : allCards.filter(card => {
-                            // Filter cards by target audience (multiple selection support)
-                            if (!card.targetAudiences || card.targetAudiences.length === 0) return false;
-                            const targetMap = {
-                              'private-users': 'B2C',
-                              'schools': 'B2E',
-                              'businesses': 'B2B'
-                            };
-                            const selectedTargets = Array.isArray(formData.targetAudience) ? formData.targetAudience : [formData.targetAudience];
-                            const targetValues = selectedTargets.map(ta => targetMap[ta]).filter(Boolean);
-                            return targetValues.some(tv => card.targetAudiences.includes(tv));
-                          }).length === 0 ? (
-                            <MenuItem disabled>No cards available for selected target audience(s)</MenuItem>
-                          ) : (
-                            allCards
-                              .filter(card => {
-                                // Filter cards by target audience (multiple selection support)
-                                if (!card.targetAudiences || card.targetAudiences.length === 0) return false;
-                                const targetMap = {
-                                  'private-users': 'B2C',
-                                  'schools': 'B2E',
-                                  'businesses': 'B2B'
-                                };
-                                const selectedTargets = Array.isArray(formData.targetAudience) ? formData.targetAudience : [formData.targetAudience];
-                                const targetValues = selectedTargets.map(ta => targetMap[ta]).filter(Boolean);
-                                return targetValues.some(tv => card.targetAudiences.includes(tv));
-                              })
-                              .map((card) => (
-                                <MenuItem key={card._id} value={card._id}>
-                                  {card.title || 'Untitled Card'}
-                                </MenuItem>
-                              ))
-                          )}
-                        </Select>
-                      </FormControl>
+                      <Autocomplete
+                        multiple
+                        options={allCards.filter(card => {
+                          // Filter cards by target audience
+                          if (!card.targetAudiences || card.targetAudiences.length === 0) return false;
+                          const targetMap = {
+                            'private-users': 'B2C',
+                            'schools': 'B2E',
+                            'businesses': 'B2B'
+                          };
+                          const selectedTargets = Array.isArray(formData.targetAudience) ? formData.targetAudience : [formData.targetAudience];
+                          const targetValues = selectedTargets.map(ta => targetMap[ta]).filter(Boolean);
+                          return targetValues.some(tv => card.targetAudiences.includes(tv));
+                        })}
+                        getOptionLabel={(option) => option.title || 'Untitled Card'}
+                        value={allCards.filter(card => (formData.level2 || []).includes(card._id))}
+                        onChange={(event, newValue) => {
+                          setFormData({ ...formData, level2: newValue.map(card => card._id) });
+                        }}
+                        disabled={loadingCards}
+                        disablePortal
+                        componentsProps={{
+                          popper: {
+                            placement: 'bottom-start',
+                            modifiers: [
+                              {
+                                name: 'flip',
+                                enabled: false,
+                              },
+                            ],
+                          },
+                        }}
+                        renderInput={(params) => (
+                          <TextField
+                            {...params}
+                            label="Level 2 Cards"
+                            placeholder="Search cards..."
+                          />
+                        )}
+                        renderTags={(value, getTagProps) =>
+                          value.map((option, index) => (
+                            <Chip
+                              {...getTagProps({ index })}
+                              key={option._id}
+                              label={option.title || 'Untitled Card'}
+                              size="small"
+                              sx={{
+                                backgroundColor: 'rgba(11, 120, 151, 0.08)',
+                                color: '#0B7897',
+                                fontWeight: 500,
+                              }}
+                            />
+                          ))
+                        }
+                        loading={loadingCards}
+                        noOptionsText="No cards available for selected target audience(s)"
+                      />
                     </Grid>
 
                     <Grid item xs={12} md={4}>
-                      <FormControl fullWidth>
-                        <InputLabel id="level3-label">Level 3 Cards</InputLabel>
-                        <Select
-                          labelId="level3-label"
-                          multiple
-                          value={formData.level3 || []}
-                          onChange={(e) =>
-                            setFormData({ ...formData, level3: e.target.value })
-                          }
-                          input={<OutlinedInput label="Level 3 Cards" />}
-                          renderValue={(selected) => (
-                            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                              {selected.length === 0 ? (
-                                <Typography variant="body2" color="text.secondary">
-                                  None
-                                </Typography>
-                              ) : (
-                                selected.map((cardId) => {
-                                  const card = allCards.find((c) => c._id === cardId);
-                                  return (
-                                    <Chip
-                                      key={cardId}
-                                      label={card?.title || cardId}
-                                      size="small"
-                                      sx={{
-                                        backgroundColor: 'rgba(11, 120, 151, 0.08)',
-                                        color: '#0B7897',
-                                        fontWeight: 500,
-                                      }}
-                                    />
-                                  );
-                                })
-                              )}
-                            </Box>
-                          )}
-                          disabled={loadingCards}
-                        >
-                          {loadingCards ? (
-                            <MenuItem disabled>
-                              <CircularProgress size={20} sx={{ mr: 1 }} />
-                              Loading...
-                            </MenuItem>
-                          ) : allCards.filter(card => {
-                            // Filter cards by target audience (multiple selection support)
-                            if (!card.targetAudiences || card.targetAudiences.length === 0) return false;
-                            const targetMap = {
-                              'private-users': 'B2C',
-                              'schools': 'B2E',
-                              'businesses': 'B2B'
-                            };
-                            const selectedTargets = Array.isArray(formData.targetAudience) ? formData.targetAudience : [formData.targetAudience];
-                            const targetValues = selectedTargets.map(ta => targetMap[ta]).filter(Boolean);
-                            return targetValues.some(tv => card.targetAudiences.includes(tv));
-                          }).length === 0 ? (
-                            <MenuItem disabled>No cards available for selected target audience(s)</MenuItem>
-                          ) : (
-                            allCards
-                              .filter(card => {
-                                // Filter cards by target audience (multiple selection support)
-                                if (!card.targetAudiences || card.targetAudiences.length === 0) return false;
-                                const targetMap = {
-                                  'private-users': 'B2C',
-                                  'schools': 'B2E',
-                                  'businesses': 'B2B'
-                                };
-                                const selectedTargets = Array.isArray(formData.targetAudience) ? formData.targetAudience : [formData.targetAudience];
-                                const targetValues = selectedTargets.map(ta => targetMap[ta]).filter(Boolean);
-                                return targetValues.some(tv => card.targetAudiences.includes(tv));
-                              })
-                              .map((card) => (
-                                <MenuItem key={card._id} value={card._id}>
-                                  {card.title || 'Untitled Card'}
-                                </MenuItem>
-                              ))
-                          )}
-                        </Select>
-                      </FormControl>
+                      <Autocomplete
+                        multiple
+                        options={allCards.filter(card => {
+                          // Filter cards by target audience
+                          if (!card.targetAudiences || card.targetAudiences.length === 0) return false;
+                          const targetMap = {
+                            'private-users': 'B2C',
+                            'schools': 'B2E',
+                            'businesses': 'B2B'
+                          };
+                          const selectedTargets = Array.isArray(formData.targetAudience) ? formData.targetAudience : [formData.targetAudience];
+                          const targetValues = selectedTargets.map(ta => targetMap[ta]).filter(Boolean);
+                          return targetValues.some(tv => card.targetAudiences.includes(tv));
+                        })}
+                        getOptionLabel={(option) => option.title || 'Untitled Card'}
+                        value={allCards.filter(card => (formData.level3 || []).includes(card._id))}
+                        onChange={(event, newValue) => {
+                          setFormData({ ...formData, level3: newValue.map(card => card._id) });
+                        }}
+                        disabled={loadingCards}
+                        disablePortal
+                        componentsProps={{
+                          popper: {
+                            placement: 'bottom-start',
+                            modifiers: [
+                              {
+                                name: 'flip',
+                                enabled: false,
+                              },
+                            ],
+                          },
+                        }}
+                        renderInput={(params) => (
+                          <TextField
+                            {...params}
+                            label="Level 3 Cards"
+                            placeholder="Search cards..."
+                          />
+                        )}
+                        renderTags={(value, getTagProps) =>
+                          value.map((option, index) => (
+                            <Chip
+                              {...getTagProps({ index })}
+                              key={option._id}
+                              label={option.title || 'Untitled Card'}
+                              size="small"
+                              sx={{
+                                backgroundColor: 'rgba(11, 120, 151, 0.08)',
+                                color: '#0B7897',
+                                fontWeight: 500,
+                              }}
+                            />
+                          ))
+                        }
+                        loading={loadingCards}
+                        noOptionsText="No cards available for selected target audience(s)"
+                      />
                     </Grid>
                   </Grid>
                   <Typography variant="caption" color="text.secondary" sx={{ mt: 1 }}>
