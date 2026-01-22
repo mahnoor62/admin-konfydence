@@ -1944,13 +1944,16 @@ function ProductsContent() {
                         >
                           <EditIcon />
                         </IconButton>
-                        <IconButton
-                          size="small"
-                          onClick={() => handleDeleteClick(product)}
-                          title="Delete"
-                        >
-                          <DeleteIcon />
-                        </IconButton>
+                        {/* Only show delete button for private products */}
+                        {product.visibility === 'private' && (
+                          <IconButton
+                            size="small"
+                            onClick={() => handleDeleteClick(product)}
+                            title="Delete"
+                          >
+                            <DeleteIcon />
+                          </IconButton>
+                        )}
                       </TableCell>
                     </TableRow>
                   );
