@@ -2451,10 +2451,11 @@ function ProductsContent() {
                           return targetValues.some(tv => card.targetAudiences.includes(tv));
                         })}
                         getOptionLabel={(option) => option.title || 'Untitled Card'}
-                        value={allCards.filter(card => (formData.level1 || []).includes(card._id))}
+                        value={(formData.level1 || []).map(id => allCards.find(card => card._id === id)).filter(Boolean)}
                         onChange={(event, newValue) => {
                           setFormData({ ...formData, level1: newValue.map(card => card._id) });
                         }}
+                        isOptionEqualToValue={(option, value) => option._id === value._id}
                         disabled={loadingCards}
                         disablePortal
                         componentsProps={{
@@ -2511,10 +2512,11 @@ function ProductsContent() {
                           return targetValues.some(tv => card.targetAudiences.includes(tv));
                         })}
                         getOptionLabel={(option) => option.title || 'Untitled Card'}
-                        value={allCards.filter(card => (formData.level2 || []).includes(card._id))}
+                        value={(formData.level2 || []).map(id => allCards.find(card => card._id === id)).filter(Boolean)}
                         onChange={(event, newValue) => {
                           setFormData({ ...formData, level2: newValue.map(card => card._id) });
                         }}
+                        isOptionEqualToValue={(option, value) => option._id === value._id}
                         disabled={loadingCards}
                         disablePortal
                         componentsProps={{
@@ -2571,10 +2573,11 @@ function ProductsContent() {
                           return targetValues.some(tv => card.targetAudiences.includes(tv));
                         })}
                         getOptionLabel={(option) => option.title || 'Untitled Card'}
-                        value={allCards.filter(card => (formData.level3 || []).includes(card._id))}
+                        value={(formData.level3 || []).map(id => allCards.find(card => card._id === id)).filter(Boolean)}
                         onChange={(event, newValue) => {
                           setFormData({ ...formData, level3: newValue.map(card => card._id) });
                         }}
+                        isOptionEqualToValue={(option, value) => option._id === value._id}
                         disabled={loadingCards}
                         disablePortal
                         componentsProps={{
