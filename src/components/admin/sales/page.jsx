@@ -29,6 +29,7 @@ import {
   MenuItem,
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
+import VisibilityIcon from '@mui/icons-material/Visibility';
 import axios from 'axios';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
@@ -69,6 +70,8 @@ export default function Sales() {
   const [itemToDelete, setItemToDelete] = useState(null);
   const [isDeletingContract, setIsDeletingContract] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [viewDialogOpen, setViewDialogOpen] = useState(false);
+  const [selectedTransaction, setSelectedTransaction] = useState(null);
 
   const fetchData = useCallback(async () => {
     try {
@@ -99,9 +102,9 @@ export default function Sales() {
         const customPackagesRes = customPackagesResult.status === 'fulfilled' ? customPackagesResult.value : { data: [] };
         
         // Combine B2B/B2E transactions with custom packages
-        // Filter out transactions without organizationId or customPackageId
+        // Filter out transactions without organizationId, schoolId, or customPackageId
         const transactions = (b2bRes.data || []).filter(tx => 
-          tx.organizationId || tx.customPackageId
+          tx.organizationId || tx.schoolId || tx.customPackageId
         );
         
         // Filter out custom packages without organizationId
@@ -212,6 +215,16 @@ export default function Sales() {
   const handleCloseDelete = () => {
     setDeleteDialogOpen(false);
     setItemToDelete(null);
+  };
+
+  const handleOpenView = (transaction) => {
+    setSelectedTransaction(transaction);
+    setViewDialogOpen(true);
+  };
+
+  const handleCloseView = () => {
+    setViewDialogOpen(false);
+    setSelectedTransaction(null);
   };
 
   const handleConfirmDelete = async () => {
@@ -389,6 +402,7 @@ export default function Sales() {
                   <TableCell>Type</TableCell>
                   <TableCell>Amount</TableCell>
                   <TableCell>Status</TableCell>
+                  <TableCell>Stripe Payment ID</TableCell>
                   <TableCell>Date</TableCell>
                   <TableCell>Actions</TableCell>
                 </TableRow>
@@ -396,7 +410,7 @@ export default function Sales() {
               <TableBody>
                 {allTransactions.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} align="center">
+                    <TableCell colSpan={8} align="center">
                       <Typography color="text.secondary">No transactions found</Typography>
                     </TableCell>
                   </TableRow>
@@ -445,16 +459,35 @@ export default function Sales() {
                           size="small"
                         />
                       </TableCell>
+                      <TableCell>
+                        {tx.stripePaymentIntentId ? (
+                          <Typography variant="body2" sx={{ fontSize: '0.75rem', fontFamily: 'monospace' }}>
+                            {tx.stripePaymentIntentId.substring(0, 20)}...
+                          </Typography>
+                        ) : (
+                          <Typography variant="body2" color="text.secondary">N/A</Typography>
+                        )}
+                      </TableCell>
                       <TableCell>{new Date(tx.createdAt).toLocaleDateString()}</TableCell>
                       <TableCell>
-                        <IconButton 
-                          size="small" 
-                          onClick={() => handleOpenDelete(tx, false)} 
-                          color="error"
-                          title="Delete Transaction"
-                        >
-                          <DeleteIcon />
-                        </IconButton>
+                        <Box sx={{ display: 'flex', gap: 1 }}>
+                          <IconButton 
+                            size="small" 
+                            onClick={() => handleOpenView(tx)} 
+                            color="primary"
+                            title="View Details"
+                          >
+                            <VisibilityIcon />
+                          </IconButton>
+                          <IconButton 
+                            size="small" 
+                            onClick={() => handleOpenDelete(tx, false)} 
+                            color="error"
+                            title="Delete Transaction"
+                          >
+                            <DeleteIcon />
+                          </IconButton>
+                        </Box>
                       </TableCell>
                     </TableRow>
                     );
@@ -470,7 +503,7 @@ export default function Sales() {
           <Table>
             <TableHead>
               <TableRow>
-                <TableCell>Organization</TableCell>
+                <TableCell>Organization/School</TableCell>
                 <TableCell>Custom Package</TableCell>
                 <TableCell>Type</TableCell>
                 <TableCell>Amount</TableCell>
@@ -490,7 +523,9 @@ export default function Sales() {
               ) : (
                 b2bB2eContracts.map((contract) => (
                   <TableRow key={contract._id}>
-                    <TableCell>{contract.organizationId?.name || 'N/A'}</TableCell>
+                    <TableCell>
+                      {contract.organizationId?.name || contract.schoolId?.name || 'N/A'}
+                    </TableCell>
                     <TableCell>
                       {contract.customPackageId?.name || 
                        contract.customPackageId?.basePackageId?.name || 
@@ -653,6 +688,447 @@ export default function Sales() {
             disabled={deleting || isDeletingContract}
           >
             {deleting || isDeletingContract ? 'Deleting...' : 'Delete'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* View Transaction Details Dialog */}
+      <Dialog open={viewDialogOpen} onClose={handleCloseView} maxWidth="md" fullWidth>
+        <DialogTitle sx={{ borderBottom: 1, borderColor: 'divider', pb: 2 }}>
+          Transaction Details
+        </DialogTitle>
+        <DialogContent sx={{ mt: 2 }}>
+          {selectedTransaction && (
+            <Box>
+              {/* Basic Information */}
+              <Typography variant="h6" gutterBottom sx={{ color: 'primary.main', mb: 2 }}>
+                Basic Information
+              </Typography>
+              <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2, mb: 3 }}>
+                <Box>
+                  <Typography variant="subtitle2" color="text.secondary">Transaction ID</Typography>
+                  <Typography variant="body2" sx={{ fontFamily: 'monospace', wordBreak: 'break-all' }}>
+                    {selectedTransaction._id}
+                  </Typography>
+                </Box>
+                <Box>
+                  <Typography variant="subtitle2" color="text.secondary">Type</Typography>
+                  <Chip label={selectedTransaction.type} size="small" color="primary" />
+                </Box>
+                <Box>
+                  <Typography variant="subtitle2" color="text.secondary">Status</Typography>
+                  <Chip 
+                    label={selectedTransaction.status}
+                    size="small"
+                    color={
+                      selectedTransaction.status === 'paid' ? 'success' :
+                      selectedTransaction.status === 'pending' ? 'warning' :
+                      selectedTransaction.status === 'failed' ? 'error' : 'default'
+                    }
+                  />
+                </Box>
+                <Box>
+                  <Typography variant="subtitle2" color="text.secondary">Amount</Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 'bold', fontSize: '1.1rem' }}>
+                    {formatCurrency(selectedTransaction.amount, selectedTransaction.currency)}
+                  </Typography>
+                </Box>
+              </Box>
+
+              {/* Contract Period */}
+              {(selectedTransaction.contractPeriod?.startDate || selectedTransaction.contractPeriod?.endDate) && (
+                <>
+                  <Typography variant="h6" gutterBottom sx={{ color: 'primary.main', mb: 2, mt: 3 }}>
+                    Contract Period
+                  </Typography>
+                  <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2, mb: 3 }}>
+                    {selectedTransaction.contractPeriod.startDate && (
+                      <Box>
+                        <Typography variant="subtitle2" color="text.secondary">Start Date</Typography>
+                        <Typography variant="body2">
+                          {new Date(selectedTransaction.contractPeriod.startDate).toLocaleDateString()}
+                        </Typography>
+                      </Box>
+                    )}
+                    {selectedTransaction.contractPeriod.endDate && (
+                      <Box>
+                        <Typography variant="subtitle2" color="text.secondary">End Date</Typography>
+                        <Typography variant="body2">
+                          {new Date(selectedTransaction.contractPeriod.endDate).toLocaleDateString()}
+                        </Typography>
+                      </Box>
+                    )}
+                  </Box>
+                </>
+              )}
+
+              {/* Stripe Information */}
+              {(selectedTransaction.stripePaymentIntentId || selectedTransaction.stripeSessionId) && (
+                <>
+                  <Typography variant="h6" gutterBottom sx={{ color: 'primary.main', mb: 2, mt: 3 }}>
+                    Stripe Information
+                  </Typography>
+                  <Box sx={{ display: 'grid', gridTemplateColumns: '1fr', gap: 2, mb: 3 }}>
+                    {selectedTransaction.stripePaymentIntentId && (
+                      <Box>
+                        <Typography variant="subtitle2" color="text.secondary">Payment Intent ID</Typography>
+                        <Typography variant="body2" sx={{ fontFamily: 'monospace', wordBreak: 'break-all' }}>
+                          {selectedTransaction.stripePaymentIntentId}
+                        </Typography>
+                      </Box>
+                    )}
+                    {selectedTransaction.stripeSessionId && (
+                      <Box>
+                        <Typography variant="subtitle2" color="text.secondary">Session ID</Typography>
+                        <Typography variant="body2" sx={{ fontFamily: 'monospace', wordBreak: 'break-all' }}>
+                          {selectedTransaction.stripeSessionId}
+                        </Typography>
+                      </Box>
+                    )}
+                  </Box>
+                </>
+              )}
+
+              {/* User/Organization Information */}
+              <Typography variant="h6" gutterBottom sx={{ color: 'primary.main', mb: 2, mt: 3 }}>
+                Customer Information
+              </Typography>
+              <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2, mb: 3 }}>
+                {selectedTransaction.userId && (
+                  <>
+                    <Box>
+                      <Typography variant="subtitle2" color="text.secondary">User ID</Typography>
+                      <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>
+                        {typeof selectedTransaction.userId === 'object' ? selectedTransaction.userId._id : selectedTransaction.userId}
+                      </Typography>
+                    </Box>
+                    {typeof selectedTransaction.userId === 'object' && selectedTransaction.userId.name && (
+                      <Box>
+                        <Typography variant="subtitle2" color="text.secondary">User Name</Typography>
+                        <Typography variant="body2">{selectedTransaction.userId.name}</Typography>
+                      </Box>
+                    )}
+                    {typeof selectedTransaction.userId === 'object' && selectedTransaction.userId.email && (
+                      <Box>
+                        <Typography variant="subtitle2" color="text.secondary">User Email</Typography>
+                        <Typography variant="body2">{selectedTransaction.userId.email}</Typography>
+                      </Box>
+                    )}
+                  </>
+                )}
+                {selectedTransaction.organizationId && (
+                  <>
+                    <Box>
+                      <Typography variant="subtitle2" color="text.secondary">Organization</Typography>
+                      <Typography variant="body2">
+                        {selectedTransaction.organizationId.name || 'N/A'}
+                      </Typography>
+                    </Box>
+                    {selectedTransaction.organizationId.segment && (
+                      <Box>
+                        <Typography variant="subtitle2" color="text.secondary">Segment</Typography>
+                        <Chip label={selectedTransaction.organizationId.segment} size="small" />
+                      </Box>
+                    )}
+                  </>
+                )}
+                {selectedTransaction.schoolId && (
+                  <Box>
+                    <Typography variant="subtitle2" color="text.secondary">School</Typography>
+                    <Typography variant="body2">
+                      {selectedTransaction.schoolId.name || 'N/A'}
+                    </Typography>
+                  </Box>
+                )}
+              </Box>
+
+              {/* Package Information */}
+              {(selectedTransaction.packageId || selectedTransaction.customPackageId) && (
+                <>
+                  <Typography variant="h6" gutterBottom sx={{ color: 'primary.main', mb: 2, mt: 3 }}>
+                    Package Information
+                  </Typography>
+                  <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2, mb: 3 }}>
+                    {selectedTransaction.packageId && (
+                      <>
+                        <Box>
+                          <Typography variant="subtitle2" color="text.secondary">Package Name</Typography>
+                          <Typography variant="body2">{selectedTransaction.packageId.name || 'N/A'}</Typography>
+                        </Box>
+                        {selectedTransaction.packageId.description && (
+                          <Box sx={{ gridColumn: { xs: '1', md: '1 / -1' } }}>
+                            <Typography variant="subtitle2" color="text.secondary">Description</Typography>
+                            <Typography variant="body2">{selectedTransaction.packageId.description}</Typography>
+                          </Box>
+                        )}
+                      </>
+                    )}
+                    {selectedTransaction.customPackageId && (
+                      <>
+                        <Box>
+                          <Typography variant="subtitle2" color="text.secondary">Custom Package ID</Typography>
+                          <Typography variant="body2" sx={{ fontFamily: 'monospace', fontSize: '0.85rem' }}>
+                            {selectedTransaction.customPackageId._id || 'N/A'}
+                          </Typography>
+                        </Box>
+                        <Box>
+                          <Typography variant="subtitle2" color="text.secondary">Custom Package Name</Typography>
+                          <Typography variant="body2">
+                            {selectedTransaction.customPackageId.name || 'N/A'}
+                          </Typography>
+                        </Box>
+                        {selectedTransaction.customPackageId.description && (
+                          <Box sx={{ gridColumn: { xs: '1', md: '1 / -1' } }}>
+                            <Typography variant="subtitle2" color="text.secondary">Description</Typography>
+                            <Typography variant="body2">{selectedTransaction.customPackageId.description}</Typography>
+                          </Box>
+                        )}
+                        <Box>
+                          <Typography variant="subtitle2" color="text.secondary">Entity Type</Typography>
+                          <Chip 
+                            label={selectedTransaction.customPackageId.entityType || 'N/A'} 
+                            size="small" 
+                            color="secondary"
+                          />
+                        </Box>
+                        <Box>
+                          <Typography variant="subtitle2" color="text.secondary">Status</Typography>
+                          <Chip 
+                            label={selectedTransaction.customPackageId.status || 'N/A'} 
+                            size="small"
+                            color={
+                              selectedTransaction.customPackageId.status === 'active' ? 'success' :
+                              selectedTransaction.customPackageId.status === 'pending' ? 'warning' :
+                              'default'
+                            }
+                          />
+                        </Box>
+                        {selectedTransaction.customPackageId.basePackageId && (
+                          <Box>
+                            <Typography variant="subtitle2" color="text.secondary">Base Package</Typography>
+                            <Typography variant="body2">
+                              {selectedTransaction.customPackageId.basePackageId.name || 'N/A'}
+                            </Typography>
+                          </Box>
+                        )}
+                        <Box>
+                          <Typography variant="subtitle2" color="text.secondary">Seat Limit</Typography>
+                          <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
+                            {selectedTransaction.customPackageId.seatLimit || 'N/A'}
+                          </Typography>
+                        </Box>
+                        {selectedTransaction.customPackageId.contractPricing && (
+                          <>
+                            <Box>
+                              <Typography variant="subtitle2" color="text.secondary">Contract Amount</Typography>
+                              <Typography variant="body2" sx={{ fontWeight: 'bold', fontSize: '1.1rem' }}>
+                                {formatCurrency(
+                                  selectedTransaction.customPackageId.contractPricing.amount,
+                                  selectedTransaction.customPackageId.contractPricing.currency
+                                )}
+                              </Typography>
+                            </Box>
+                            <Box>
+                              <Typography variant="subtitle2" color="text.secondary">Billing Type</Typography>
+                              <Chip 
+                                label={selectedTransaction.customPackageId.contractPricing.billingType || 'N/A'} 
+                                size="small"
+                                color="info"
+                              />
+                            </Box>
+                            {selectedTransaction.customPackageId.contractPricing.notes && (
+                              <Box sx={{ gridColumn: { xs: '1', md: '1 / -1' } }}>
+                                <Typography variant="subtitle2" color="text.secondary">Pricing Notes</Typography>
+                                <Typography variant="body2">
+                                  {selectedTransaction.customPackageId.contractPricing.notes}
+                                </Typography>
+                              </Box>
+                            )}
+                          </>
+                        )}
+                        {selectedTransaction.customPackageId.contract && (
+                          <>
+                            <Box>
+                              <Typography variant="subtitle2" color="text.secondary">Contract Start</Typography>
+                              <Typography variant="body2">
+                                {selectedTransaction.customPackageId.contract.startDate 
+                                  ? new Date(selectedTransaction.customPackageId.contract.startDate).toLocaleDateString()
+                                  : 'N/A'}
+                              </Typography>
+                            </Box>
+                            <Box>
+                              <Typography variant="subtitle2" color="text.secondary">Contract End</Typography>
+                              <Typography variant="body2">
+                                {selectedTransaction.customPackageId.contract.endDate 
+                                  ? new Date(selectedTransaction.customPackageId.contract.endDate).toLocaleDateString()
+                                  : 'N/A'}
+                              </Typography>
+                            </Box>
+                            <Box>
+                              <Typography variant="subtitle2" color="text.secondary">Contract Status</Typography>
+                              <Chip 
+                                label={selectedTransaction.customPackageId.contract.status || 'N/A'} 
+                                size="small"
+                                color={
+                                  selectedTransaction.customPackageId.contract.status === 'active' ? 'success' :
+                                  selectedTransaction.customPackageId.contract.status === 'pending' ? 'warning' :
+                                  selectedTransaction.customPackageId.contract.status === 'expired' ? 'error' :
+                                  'default'
+                                }
+                              />
+                            </Box>
+                          </>
+                        )}
+                        {selectedTransaction.customPackageId.expiryTime && (
+                          <Box>
+                            <Typography variant="subtitle2" color="text.secondary">Expiry Time</Typography>
+                            <Typography variant="body2">
+                              {selectedTransaction.customPackageId.expiryTime} {selectedTransaction.customPackageId.expiryTimeUnit || 'months'}
+                            </Typography>
+                          </Box>
+                        )}
+                        {selectedTransaction.customPackageId.productIds && selectedTransaction.customPackageId.productIds.length > 0 && (
+                          <Box sx={{ gridColumn: { xs: '1', md: '1 / -1' } }}>
+                            <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                              Included Products ({selectedTransaction.customPackageId.productIds.length})
+                            </Typography>
+                            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                              {selectedTransaction.customPackageId.productIds.map((product, idx) => (
+                                <Chip 
+                                  key={idx}
+                                  label={product.name || `Product ${idx + 1}`}
+                                  size="small"
+                                  variant="outlined"
+                                />
+                              ))}
+                            </Box>
+                          </Box>
+                        )}
+                        {selectedTransaction.customPackageId.assignedCohorts && selectedTransaction.customPackageId.assignedCohorts.length > 0 && (
+                          <Box sx={{ gridColumn: { xs: '1', md: '1 / -1' } }}>
+                            <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                              Assigned Cohorts
+                            </Typography>
+                            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                              {selectedTransaction.customPackageId.assignedCohorts.map((cohort, idx) => (
+                                <Chip 
+                                  key={idx}
+                                  label={cohort}
+                                  size="small"
+                                  color="primary"
+                                  variant="outlined"
+                                />
+                              ))}
+                            </Box>
+                          </Box>
+                        )}
+                      </>
+                    )}
+                  </Box>
+                </>
+              )}
+
+              {/* Seats & Usage Information */}
+              {(selectedTransaction.maxSeats || selectedTransaction.usedSeats !== undefined || selectedTransaction.codeApplications !== undefined) && (
+                <>
+                  <Typography variant="h6" gutterBottom sx={{ color: 'primary.main', mb: 2, mt: 3 }}>
+                    Seats & Usage
+                  </Typography>
+                  <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2, mb: 3 }}>
+                    {selectedTransaction.uniqueCode && (
+                      <Box>
+                        <Typography variant="subtitle2" color="text.secondary">Unique Code</Typography>
+                        <Typography variant="body2" sx={{ fontFamily: 'monospace', fontWeight: 'bold', fontSize: '1rem', color: 'primary.main' }}>
+                          {selectedTransaction.uniqueCode}
+                        </Typography>
+                      </Box>
+                    )}
+                    {selectedTransaction.maxSeats && (
+                      <Box>
+                        <Typography variant="subtitle2" color="text.secondary">Max Seats</Typography>
+                        <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
+                          {selectedTransaction.maxSeats}
+                        </Typography>
+                      </Box>
+                    )}
+                    {selectedTransaction.usedSeats !== undefined && (
+                      <Box>
+                        <Typography variant="subtitle2" color="text.secondary">Used Seats</Typography>
+                        <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
+                          {selectedTransaction.usedSeats}
+                        </Typography>
+                      </Box>
+                    )}
+                    {selectedTransaction.codeApplications !== undefined && (
+                      <Box>
+                        <Typography variant="subtitle2" color="text.secondary">Code Applications</Typography>
+                        <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
+                          {selectedTransaction.codeApplications}
+                        </Typography>
+                      </Box>
+                    )}
+                  </Box>
+                </>
+              )}
+
+              {/* Additional Fields */}
+              {(selectedTransaction.notes || selectedTransaction.metadata || selectedTransaction.webhookData) && (
+                <>
+                  <Typography variant="h6" gutterBottom sx={{ color: 'primary.main', mb: 2, mt: 3 }}>
+                    Additional Information
+                  </Typography>
+                  <Box sx={{ display: 'grid', gridTemplateColumns: '1fr', gap: 2 }}>
+                    {selectedTransaction.notes && (
+                      <Box>
+                        <Typography variant="subtitle2" color="text.secondary">Notes</Typography>
+                        <Typography variant="body2">{selectedTransaction.notes}</Typography>
+                      </Box>
+                    )}
+                    {selectedTransaction.webhookData && (
+                      <Box>
+                        <Typography variant="subtitle2" color="text.secondary">Webhook Data</Typography>
+                        <Box 
+                          component="pre" 
+                          sx={{ 
+                            backgroundColor: 'grey.100', 
+                            p: 2, 
+                            borderRadius: 1, 
+                            fontSize: '0.75rem',
+                            overflow: 'auto',
+                            maxHeight: '200px'
+                          }}
+                        >
+                          {JSON.stringify(selectedTransaction.webhookData, null, 2)}
+                        </Box>
+                      </Box>
+                    )}
+                    {selectedTransaction.metadata && (
+                      <Box>
+                        <Typography variant="subtitle2" color="text.secondary">Metadata</Typography>
+                        <Box 
+                          component="pre" 
+                          sx={{ 
+                            backgroundColor: 'grey.100', 
+                            p: 2, 
+                            borderRadius: 1, 
+                            fontSize: '0.75rem',
+                            overflow: 'auto',
+                            maxHeight: '200px'
+                          }}
+                        >
+                          {JSON.stringify(selectedTransaction.metadata, null, 2)}
+                        </Box>
+                      </Box>
+                    )}
+                  </Box>
+                </>
+              )}
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ borderTop: 1, borderColor: 'divider', pt: 2 }}>
+          <Button onClick={handleCloseView} variant="contained">
+            Close
           </Button>
         </DialogActions>
       </Dialog>
