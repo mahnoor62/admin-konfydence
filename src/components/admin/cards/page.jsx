@@ -680,7 +680,7 @@ export default function Cards() {
               </TextField>
             </Grid>
 
-            <Grid item xs={12}>
+            {/* <Grid item xs={12}>
               <Typography variant="body2" sx={{ mb: 1 }}>Tags</Typography>
               <Box display="flex" gap={1} alignItems="center" flexWrap="wrap">
                 {formData.tags?.map((tag, idx) => (
@@ -719,7 +719,7 @@ export default function Cards() {
                   Add
                 </Button>
               </Box>
-            </Grid>
+            </Grid> */}
 
             <Grid item xs={12}>
               <Divider sx={{ my: 2 }} />
