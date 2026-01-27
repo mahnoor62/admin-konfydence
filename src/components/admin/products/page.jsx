@@ -2432,7 +2432,7 @@ function ProductsContent() {
               {formData.targetAudience && Array.isArray(formData.targetAudience) && formData.targetAudience.length > 0 && (
                 <>
                   <Typography variant="subtitle1" sx={{ mt: 2, mb: 1, fontWeight: 'bold' }}>
-                    Attach Cards by Level
+                    Attach Cards by Environment
                   </Typography>
                   <Grid container spacing={2}>
                     <Grid item xs={12} md={4}>
@@ -2472,7 +2472,7 @@ function ProductsContent() {
                         renderInput={(params) => (
                           <TextField
                             {...params}
-                            label="Level 1 Cards"
+                            label="Environment 1 Cards"
                             placeholder="Search cards..."
                           />
                         )}
@@ -2533,7 +2533,7 @@ function ProductsContent() {
                         renderInput={(params) => (
                           <TextField
                             {...params}
-                            label="Level 2 Cards"
+                            label="Environment  2 Cards"
                             placeholder="Search cards..."
                           />
                         )}
@@ -2594,7 +2594,7 @@ function ProductsContent() {
                         renderInput={(params) => (
                           <TextField
                             {...params}
-                            label="Level 3 Cards"
+                            label="Environment  3 Cards"
                             placeholder="Search cards..."
                           />
                         )}
