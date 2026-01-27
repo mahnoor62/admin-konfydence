@@ -1514,103 +1514,24 @@ export default function LeadDetail() {
               {/* B2B Form Fields (CoMaSi) */}
               {lead.source === 'b2b_form' && (
                 <>
-                  {/* Address Information for B2B Form */}
-                  {(lead.address || lead.city || lead.state || lead.country || lead.phone || lead.department || lead.position || lead.website) && (
+                  {/* Address Information for B2B Form - HIDDEN FIELDS */}
+                  {/* Address, Country, State, City, Phone, Website fields are hidden */}
+                  {lead.department && (
                     <>
                       <Grid item xs={12}>
                         <Typography variant="subtitle1" fontWeight={600} gutterBottom sx={{ mt: 2 }}>
-                          Address Information
+                          Department Information
                         </Typography>
                         <Divider sx={{ mb: 2 }} />
                       </Grid>
-                      
-                      {lead.address && (
-                        <Grid item xs={12}>
-                          <Typography variant="caption" color="text.secondary">
-                            Address
-                          </Typography>
-                          <Typography variant="body1">
-                            {lead.address}
-                          </Typography>
-                        </Grid>
-                      )}
-                      
-                      {lead.city && (
-                        <Grid item xs={12} sm={4}>
-                          <Typography variant="caption" color="text.secondary">
-                            City
-                          </Typography>
-                          <Typography variant="body1">
-                            {lead.city}
-                          </Typography>
-                        </Grid>
-                      )}
-                      
-                      {lead.state && (
-                        <Grid item xs={12} sm={4}>
-                          <Typography variant="caption" color="text.secondary">
-                            State
-                          </Typography>
-                          <Typography variant="body1">
-                            {lead.state}
-                          </Typography>
-                        </Grid>
-                      )}
-                      
-                      {lead.country && (
-                        <Grid item xs={12} sm={4}>
-                          <Typography variant="caption" color="text.secondary">
-                            Country
-                          </Typography>
-                          <Typography variant="body1">
-                            {lead.country}
-                          </Typography>
-                        </Grid>
-                      )}
-                      
-                      {lead.phone && (
-                        <Grid item xs={12} sm={6}>
-                          <Typography variant="caption" color="text.secondary">
-                            Phone Number
-                          </Typography>
-                          <Typography variant="body1">
-                            {lead.phone}
-                          </Typography>
-                        </Grid>
-                      )}
-                      
-                      {lead.website && (
-                        <Grid item xs={12} sm={6}>
-                          <Typography variant="caption" color="text.secondary">
-                            Website
-                          </Typography>
-                          <Typography variant="body1" sx={{ wordBreak: 'break-word' }}>
-                            {lead.website}
-                          </Typography>
-                        </Grid>
-                      )}
-                      
-                      {lead.department && (
-                        <Grid item xs={12} sm={6}>
-                          <Typography variant="caption" color="text.secondary">
-                            Department
-                          </Typography>
-                          <Typography variant="body1">
-                            {lead.department}
-                          </Typography>
-                        </Grid>
-                      )}
-                      
-                      {lead.position && (
-                        <Grid item xs={12} sm={6}>
-                          <Typography variant="caption" color="text.secondary">
-                            Position
-                          </Typography>
-                          <Typography variant="body1">
-                            {lead.position}
-                          </Typography>
-                        </Grid>
-                      )}
+                      <Grid item xs={12} sm={6}>
+                        <Typography variant="caption" color="text.secondary">
+                          Department
+                        </Typography>
+                        <Typography variant="body1">
+                          {lead.department}
+                        </Typography>
+                      </Grid>
                     </>
                   )}
                   
