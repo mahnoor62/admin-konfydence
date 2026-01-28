@@ -28,6 +28,7 @@ import {
   FormControlLabel,
   Switch,
   InputAdornment,
+  Autocomplete,
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -84,7 +85,8 @@ const createInitialFormData = () => ({
   targetAudiences: [],
   isDemo: false,
   tags: [],
-  question: createInitialQuestion() // Single question object
+  question: createInitialQuestion(), // Single question object
+  customPackageRequestId: ''
 });
 
 export default function Cards() {
@@ -95,10 +97,12 @@ export default function Cards() {
   const [editing, setEditing] = useState(null);
   const [formData, setFormData] = useState(createInitialFormData());
   const [uploading, setUploading] = useState({});
+  const [customRequests, setCustomRequests] = useState([]);
   const [viewingCard, setViewingCard] = useState(null); // Card being viewed in view mode
   const [confirmDialog, setConfirmDialog] = useState({ open: false, title: '', message: '', onConfirm: null });
   const [successMessage, setSuccessMessage] = useState(null);
   const [searchTerm, setSearchTerm] = useState(''); // Search filter state
+  const [visibilityFilter, setVisibilityFilter] = useState(''); // '', 'public', 'internal', 'custom_only'
 
   const formDataRef = useRef(formData);
   useEffect(() => {
@@ -107,13 +111,14 @@ export default function Cards() {
 
   useEffect(() => {
     fetchCards();
-  }, []);
+  }, [visibilityFilter]);
 
   const fetchCards = async () => {
     try {
       setLoading(true);
       const api = getApiInstance();
-      const response = await api.get('/cards');
+      const url = visibilityFilter ? `/cards?visibility=${encodeURIComponent(visibilityFilter)}` : '/cards';
+      const response = await api.get(url);
       setCards(response.data);
       setError(null);
     } catch (err) {
@@ -194,6 +199,11 @@ export default function Cards() {
         question = createInitialQuestion();
       }
       
+      // Normalize selected custom request id (handle populated object or id string)
+      const selectedRequestId = card.customPackageRequestId
+        ? (card.customPackageRequestId._id ? String(card.customPackageRequestId._id) : String(card.customPackageRequestId))
+        : '';
+
       setFormData({
         title: card.title || '',
         category: card.category || '',
@@ -201,8 +211,12 @@ export default function Cards() {
         targetAudiences: card.targetAudiences || [],
         isDemo: card.isDemo || false,
         tags: card.tags || [],
-        question: question
+        question: question,
+        customPackageRequestId: selectedRequestId
       });
+      // fetch available custom package requests for admin to select from,
+      // include the card's selected request so the select shows the saved value
+      fetchCustomRequests(selectedRequestId || undefined);
     } else {
       setEditing(null);
       setFormData(createInitialFormData());
@@ -260,6 +274,8 @@ export default function Cards() {
         isDemo: latestFormData.isDemo || false,
         tags: latestFormData.tags || [],
         question: question
+        ,
+        customPackageRequestId: latestFormData.customPackageRequestId || undefined
       };
 
       const api = getApiInstance();
@@ -457,6 +473,38 @@ export default function Cards() {
     }
   };
 
+  // Fetch custom package requests for admin selection (incomplete requests).
+  // If selectedId is provided, ensure that request is included in the list so the select can display it.
+  const fetchCustomRequests = async (selectedId) => {
+    try {
+      const api = getApiInstance();
+      const resp = await api.get('/custom-package-requests');
+      const items = Array.isArray(resp.data) ? resp.data : resp.data?.requests || [];
+      const incomplete = items.filter(it => !it.completed && it.status !== 'completed' && it.status !== 'fulfilled');
+
+      // If there's a selectedId but it's not in incomplete list, fetch that specific request and prepend it.
+      if (selectedId) {
+        const exists = incomplete.find(it => String(it._id) === String(selectedId));
+        if (!exists) {
+          try {
+            const single = await api.get(`/custom-package-requests/${selectedId}`);
+            if (single?.data) {
+              incomplete.unshift(single.data);
+            }
+          } catch (err) {
+            // If fetching single request fails, ignore but keep incomplete list
+            console.warn('Could not fetch selected custom request:', selectedId, err?.message || err);
+          }
+        }
+      }
+
+      setCustomRequests(incomplete);
+    } catch (err) {
+      console.error('Failed to fetch custom package requests:', err);
+      setCustomRequests([]);
+    }
+  };
+
   const handleRemoveAttachment = async (attachmentIndex) => {
     const question = formData.question;
     const attachment = question?.attachments?.[attachmentIndex];
@@ -510,8 +558,8 @@ export default function Cards() {
         </Button>
       </Box>
 
-      {/* Search Filter */}
-      <Box mb={2}>
+      {/* Search Filter + Visibility */}
+      <Box mb={2} display="flex" gap={2} alignItems="center">
         <TextField
           fullWidth
           variant="outlined"
@@ -535,15 +583,29 @@ export default function Cards() {
             },
           }}
         />
+        <TextField
+          select
+          size="small"
+          value={visibilityFilter}
+          onChange={(e) => setVisibilityFilter(e.target.value)}
+          sx={{ width: 220, backgroundColor: 'white' }}
+          label="Visibility"
+        >
+          <MenuItem value="">All</MenuItem>
+          <MenuItem value="public">Public</MenuItem>
+          <MenuItem value="internal">Internal</MenuItem>
+          <MenuItem value="custom_only">Custom Only</MenuItem>
+        </TextField>
       </Box>
 
       <TableContainer component={Paper}>
         <Table>
           <TableHead>
-            <TableRow>
+          <TableRow>
               <TableCell>Title</TableCell>
               <TableCell>Category</TableCell>
               <TableCell>Visibility</TableCell>
+              <TableCell>Custom Request</TableCell>
               <TableCell>Last Updated</TableCell>
               <TableCell align="right">Actions</TableCell>
             </TableRow>
@@ -551,7 +613,7 @@ export default function Cards() {
           <TableBody>
             {filteredCards.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} align="center">
+                <TableCell colSpan={6} align="center">
                   <Typography color="text.secondary">
                     {searchTerm ? 'No cards match your search' : 'No cards found'}
                   </Typography>
@@ -578,6 +640,9 @@ export default function Cards() {
                         color={card.visibility === 'public' ? 'success' : 'default'}
                         variant="outlined"
                       />
+                    </TableCell>
+                    <TableCell>
+                      {card.customPackageRequestId ? (card.customPackageRequestId.organizationName || card.customPackageRequestId.contactName || '') : ''}
                     </TableCell>
                     <TableCell>
                       <Typography variant="body2" color="text.secondary">
@@ -654,13 +719,39 @@ export default function Cards() {
                 select
                 label="Visibility"
                 value={formData.visibility}
-                onChange={(e) => setFormData({ ...formData, visibility: e.target.value })}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setFormData({ ...formData, visibility: v });
+                  if (v === 'custom_only') fetchCustomRequests();
+                }}
               >
                 <MenuItem value="public">Public</MenuItem>
                 <MenuItem value="internal">Internal</MenuItem>
                 <MenuItem value="custom_only">Custom Only</MenuItem>
               </TextField>
             </Grid>
+
+            {formData.visibility === 'custom_only' && (
+              <Grid item xs={12} sm={6}>
+                <Autocomplete
+                  options={customRequests}
+                  getOptionLabel={(option) => option ? (option.organizationName || option.contactName || (`Request ${String(option._id).slice(-6)}`)) : ''}
+                  value={customRequests.find(r => String(r._id) === String(formData.customPackageRequestId)) || null}
+                  onChange={(e, newValue) => {
+                    setFormData({ ...formData, customPackageRequestId: newValue ? newValue._id : '' });
+                  }}
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      label="Link to Custom Request"
+                      helperText={customRequests.length === 0 ? 'No open custom package requests' : 'Select the custom request this card is for'}
+                      fullWidth
+                    />
+                  )}
+                  isOptionEqualToValue={(option, value) => String(option._id) === String(value._id)}
+                />
+              </Grid>
+            )}
 
             <Grid item xs={12}>
               <TextField
@@ -870,55 +961,12 @@ export default function Cards() {
         <DialogContent sx={{ maxHeight: '80vh', overflowY: 'auto' }}>
           {viewingCard && (
             <Box>
+              {/* Card Information section intentionally hidden per admin preference */}
               <Grid container spacing={2} sx={{ mt: 1 }}>
-                <Grid item xs={12}>
-                  <Typography variant="h6" sx={{ mb: 2 }}>Card Information</Typography>
-                  <Box sx={{ p: 2, bgcolor: '#f5f5f5', borderRadius: 1, mb: 2 }}>
-                    <Typography variant="body2" color="text.secondary">Title:</Typography>
-                    <Typography variant="body1" fontWeight="medium">{viewingCard.title}</Typography>
-                    {viewingCard.category && (
-                      <>
-                        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>Category:</Typography>
-                        <Typography variant="body2">{viewingCard.category}</Typography>
-                      </>
-                    )}
-                    {viewingCard.visibility && (
-                      <>
-                        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>Visibility:</Typography>
-                        <Typography variant="body2">{viewingCard.visibility}</Typography>
-                      </>
-                    )}
-                    {viewingCard.targetAudiences && viewingCard.targetAudiences.length > 0 && (
-                      <>
-                        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>Target Audiences:</Typography>
-                        <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', mt: 0.5 }}>
-                          {viewingCard.targetAudiences.map((aud, idx) => (
-                            <Chip key={idx} label={aud} size="small" />
-                          ))}
-                        </Box>
-                      </>
-                    )}
-                    {viewingCard.tags && viewingCard.tags.length > 0 && (
-                      <>
-                        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>Tags:</Typography>
-                        <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', mt: 0.5 }}>
-                          {viewingCard.tags.map((tag, idx) => (
-                            <Chip key={idx} label={tag} size="small" variant="outlined" />
-                          ))}
-                        </Box>
-                      </>
-                    )}
-                    <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>Created:</Typography>
-                    <Typography variant="body2">{new Date(viewingCard.createdAt).toLocaleString()}</Typography>
-                    <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>Last Updated:</Typography>
-                    <Typography variant="body2">{new Date(viewingCard.updatedAt).toLocaleString()}</Typography>
-                  </Box>
-                </Grid>
-
                 <Grid item xs={12}>
                   <Divider sx={{ my: 2 }} />
                   <Typography variant="h6" sx={{ mb: 2, fontWeight: 'bold' }}>
-                    Card
+                    Card Information
                   </Typography>
                   
                   {/* Support both old (questions array/levels) and new (single question) structure */}
@@ -946,51 +994,135 @@ export default function Cards() {
                     if (!questionToShow || (!questionToShow.description?.trim() && !questionToShow.questionText?.trim())) {
                       return <Typography variant="body2" color="text.secondary">No question available</Typography>;
                     }
-                    
+
                     const question = questionToShow;
                     const questionDesc = question.description || question.questionText || '';
-                    
+
+                    // Render Play-style front card UI followed by back/detail view
                     return (
-                      <Grid container spacing={2}>
-                        <Grid item xs={12}>
-                          <Typography variant="subtitle2" color="text.secondary">Question:</Typography>
-                          <Typography variant="body1" sx={{ mt: 0.5 }}>{questionDesc}</Typography>
-                        </Grid>
-                        <Grid item xs={12}>
-                          <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>Answers:</Typography>
-                          {question.answers?.map((answer, ansIdx) => (
-                            <Box key={ansIdx} sx={{ mb: 1, p: 1, bgcolor: '#f9f9f9', borderRadius: 1 }}>
-                              <Typography variant="body2">
-                                <strong>Answer {ansIdx + 1}:</strong> {answer.text} 
-                                <Chip label={`Score: ${answer.scoring}`} size="small" sx={{ ml: 1 }} />
-                              </Typography>
+                      <Grid container spacing={2} sx={{ justifyContent: 'center' }}>
+                        <Grid item xs={12} md={6} sx={{ display: 'flex', justifyContent: 'center' }}>
+                          {/* Front card UI */}
+                          <Box sx={{
+                            width: { xs: '100%', md: 320 },
+                            background: '#000B3D',
+                            color: '#fff',
+                            borderRadius: 3,
+                            p: 3,
+                            boxSizing: 'border-box',
+                            minHeight: 520,
+                            boxShadow: '0 12px 30px rgba(6,60,94,0.18)',
+                            textAlign: 'center',
+                            border: '3px solid rgba(255,178,0,0.9)',
+                            overflow: 'visible',
+                            height: 520,
+                            display: 'flex',
+                            flexDirection: 'column',
+                            justifyContent: 'space-between',
+                            fontFamily: "'Segoe UI', Roboto, Arial, sans-serif"
+                            }}>
+                            <Box sx={{ mb: 1 }}>
+                              <img src="/logo.png" alt="Konfydence" style={{ height: 44, filter: 'drop-shadow(0 1px 0 rgba(0,0,0,0.2))' }} />
                             </Box>
-                          ))}
-                        </Grid>
-                        {question.feedback && (
-                          <Grid item xs={12}>
-                            <Typography variant="subtitle2" color="text.secondary">Feedback:</Typography>
-                            <Typography variant="body2" sx={{ mt: 0.5 }}>{question.feedback}</Typography>
-                          </Grid>
-                        )}
-                        {question.attachments && question.attachments.length > 0 && (
-                          <Grid item xs={12}>
-                            <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>Attachments:</Typography>
-                            {question.attachments.map((att, attIdx) => (
-                              <Box key={attIdx} sx={{ mb: 1, p: 1, bgcolor: '#f9f9f9', borderRadius: 1, display: 'flex', justifyContent: 'space-between' }}>
-                                <Box>
-                                  <Typography variant="body2" fontWeight="bold">{att.title}</Typography>
-                                  <Typography variant="caption" color="text.secondary">
-                                    {att.type.toUpperCase()}
-                                  </Typography>
-                                </Box>
-                                <Button size="small" href={att.url} target="_blank" rel="noopener noreferrer">
-                                  View
-                                </Button>
+                            <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', overflowY: 'auto', pr: 1,
+                                '&::-webkit-scrollbar': { width: 8 },
+                                '&::-webkit-scrollbar-thumb': { backgroundColor: 'rgba(255,178,0,0.9)', borderRadius: 4 },
+                                '&::-webkit-scrollbar-track': { backgroundColor: 'rgba(255,255,255,0.02)' },
+                                scrollbarWidth: 'thin',
+                                scrollbarColor: 'rgba(255,178,0,0.9) rgba(255,255,255,0.02)'
+                              }}>
+                              <Typography variant="h6" sx={{ fontWeight: 800, mb: 1, letterSpacing: 0.6 }}>{viewingCard.title}</Typography>
+                              <Divider sx={{ borderColor: 'rgba(255,178,0,0.5)', my: 2 }} />
+                              <Typography variant="body1" sx={{ mb: 2 }}>{questionDesc}</Typography>
+                              <Box sx={{ textAlign: 'left', mt: 2 }}>
+                                {(question.answers || []).map((ans, i) => (
+                                  <Box key={i} sx={{ display: 'flex', alignItems: 'flex-start', gap: 1, mb: 1 }}>
+                                    <Typography variant="body2" sx={{ fontWeight: 700, color: '#FFD27A', minWidth: 24 }}>
+                                      {String.fromCharCode(65 + i)}
+                                    </Typography>
+                                    <Typography variant="body2" sx={{ color: '#fff' }}>
+                                      {ans.text}
+                                    </Typography>
+                                  </Box>
+                                ))}
                               </Box>
-                            ))}
-                          </Grid>
-                        )}
+                            </Box>
+                          </Box>
+                        </Grid>
+
+                        <Grid item xs={12} md={6} sx={{ display: 'flex', justifyContent: 'center' }}>
+                          {/* Back/detail view */}
+                          <Box sx={{
+                            width: { xs: '100%', md: 320 },
+                            background: '#000B3D',
+                            border: '3px solid rgba(255,178,0,0.9)',
+                            color: '#fff',
+                            borderRadius: 3,
+                            p: 2,
+                            boxSizing: 'border-box',
+                            minHeight: 520,
+                            boxShadow: '0 10px 30px rgba(6,60,94,0.18)',
+                            height: 520,
+                            display: 'flex',
+                            flexDirection: 'column',
+                            justifyContent: 'flex-start',
+                            fontFamily: "'Segoe UI', Roboto, Arial, sans-serif"
+                            }}>
+                            <Box sx={{ textAlign: 'center', mb: 1 }}>
+                              <img src="/logo.png" alt="Konfydence" style={{ height: 36, filter: 'drop-shadow(0 1px 0 rgba(0,0,0,0.2))' }} />
+                            </Box>
+                            <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', overflowY: 'auto', pr: 1,
+                                '&::-webkit-scrollbar': { width: 8 },
+                                '&::-webkit-scrollbar-thumb': { backgroundColor: 'rgba(255,178,0,0.9)', borderRadius: 4 },
+                                '&::-webkit-scrollbar-track': { backgroundColor: 'rgba(255,255,255,0.02)' },
+                                scrollbarWidth: 'thin',
+                                scrollbarColor: 'rgba(255,178,0,0.9) rgba(255,255,255,0.02)'
+                              }}>
+                              {/* Scoring first - show all answers with their score */}
+                              <Typography variant="subtitle2" sx={{ color: '#FFD27A' }}>Scoring</Typography>
+                              <Box sx={{ mt: 1 }}>
+                                {(question.answers || []).map((ans, i) => (
+                                  <Typography key={i} variant="body2" sx={{ color: '#fff' }}>
+                                    {String.fromCharCode(65 + i)}:  — <strong>{ans.scoring ?? 0}</strong>
+                                  </Typography>
+                                ))}
+                              </Box>
+
+                              <Divider sx={{ my: 2, borderColor: 'rgba(255,178,0,0.35)' }} />
+
+                              {/* Then Why / feedback */}
+                              <Typography variant="h6" sx={{ mb: 1, color: '#FFD27A' }}>Why</Typography>
+                              {question.feedback ? (
+                                <Typography variant="body2" sx={{ mt: 1 }}>{question.feedback}</Typography>
+                              ) : (
+                                <Typography variant="body2" color="rgba(255,255,255,0.85)" sx={{ mt: 1 }}>No feedback provided.</Typography>
+                              )}
+
+                              <Divider sx={{ my: 2, borderColor: 'rgba(255,178,0,0.35)' }} />
+
+                              {/* Attachments */}
+                              <Typography variant="subtitle2" sx={{ color: '#FFD27A' }}>Attachments</Typography>
+                              {question.attachments && question.attachments.length > 0 ? (
+                                question.attachments.map((att, idx) => (
+                                  <Box key={idx} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 1, p: 1, bgcolor: 'rgba(255,255,255,0.06)', borderRadius: 1 }}>
+                                    <Typography variant="body2" sx={{ color: '#fff' }}>{att.title || att.url}</Typography>
+                                    <Button size="small" href={att.url} target="_blank" rel="noopener noreferrer">Open</Button>
+                                  </Box>
+                                ))
+                              ) : (
+                                <Typography variant="body2" color="rgba(255,255,255,0.8)" sx={{ mt: 1 }}>No attachments</Typography>
+                              )}
+
+                              {/* Small footer at the bottom of the back card */}
+                              <Box sx={{ mt: 3, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
+                                <img src="/logo.png" alt="Konfydence" style={{ height: 20, filter: 'drop-shadow(0 1px 0 rgba(0,0,0,0.2))' }} />
+                                <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.85)' }}>
+                                  Konfydence — Outsmart Scams, Together!
+                                </Typography>
+                              </Box>
+                              </Box>
+                            </Box>
+                        </Grid>
                       </Grid>
                     );
                   })()}

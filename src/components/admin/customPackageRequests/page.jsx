@@ -1168,98 +1168,132 @@ export default function CustomPackageRequests() {
                       <CircularProgress size={24} />
                     </Box>
                   ) : (
-                    <FormControl fullWidth>
-                      <InputLabel id="products-label">Select Products</InputLabel>
-                      <Select
-                        labelId="products-label"
-                        multiple
-                        value={(createPackageData.selectedProductIds || []).map(id => id?.toString ? id.toString() : String(id))}
-                        onChange={(e) => {
-                          const selectedIds = e.target.value;
-                          // Convert back to product objects/IDs
-                          const products = allProducts.filter(p => {
-                            const pId = p._id?.toString ? p._id.toString() : String(p._id);
-                            return selectedIds.includes(pId) && p.visibility === 'private';
-                          });
-                          setCreatePackageData({
-                            ...createPackageData,
-                            selectedProductIds: products.map(p => p._id)
-                          });
-                        }}
-                        input={<OutlinedInput label="Select Products" />}
-                        renderValue={(selected) => (
-                          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                            {selected.length === 0 ? (
-                              <Typography variant="body2" color="text.secondary">
-                                None selected
-                              </Typography>
+                    (() => {
+                      // Filter private products for the selected organization/institute (if any)
+                      const filteredProductsForSelection = allProducts.filter(p => {
+                        if (p.visibility !== 'private') return false;
+                        const allowedOrgs = Array.isArray(p.allowedOrganizations)
+                          ? p.allowedOrganizations.map(o => (o && o._id) ? String(o._id) : String(o))
+                          : [];
+                        const allowedInsts = Array.isArray(p.allowedInstitutes)
+                          ? p.allowedInstitutes.map(i => (i && i._id) ? String(i._id) : String(i))
+                          : [];
+
+                        // Include product if it's explicitly linked to the same custom request
+                        const linkedReqId = p.linkedCustomRequestId && (p.linkedCustomRequestId._id ? String(p.linkedCustomRequestId._id) : String(p.linkedCustomRequestId));
+                        if (selectedRequest && linkedReqId && String(linkedReqId) === String(selectedRequest._id)) {
+                          return true;
+                        }
+
+                        if (createPackageData.entityType === 'organization') {
+                          if (createPackageData.organizationId) {
+                            return allowedOrgs.includes(String(createPackageData.organizationId));
+                          }
+                          return true;
+                        }
+                        if (createPackageData.entityType === 'institute') {
+                          if (createPackageData.schoolId) {
+                            return allowedInsts.includes(String(createPackageData.schoolId));
+                          }
+                          return true;
+                        }
+                        return true;
+                      });
+
+                      return (
+                        <FormControl fullWidth>
+                          <InputLabel id="products-label">Select Products</InputLabel>
+                          <Select
+                            labelId="products-label"
+                            multiple
+                            value={(createPackageData.selectedProductIds || []).map(id => id?.toString ? id.toString() : String(id))}
+                            onChange={(e) => {
+                              const selectedIds = e.target.value;
+                              const products = filteredProductsForSelection.filter(p => {
+                                const pId = p._id?.toString ? p._id.toString() : String(p._id);
+                                return selectedIds.includes(pId);
+                              });
+                              setCreatePackageData({
+                                ...createPackageData,
+                                selectedProductIds: products.map(p => p._id)
+                              });
+                            }}
+                            input={<OutlinedInput label="Select Products" />}
+                            renderValue={(selected) => (
+                              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                                {selected.length === 0 ? (
+                                  <Typography variant="body2" color="text.secondary">
+                                    None selected
+                                  </Typography>
+                                ) : (
+                                  selected.map((productIdStr) => {
+                                    const product = allProducts.find((p) => {
+                                      const pId = p._id?.toString ? p._id.toString() : String(p._id);
+                                      return pId === productIdStr && p.visibility === 'private';
+                                    });
+                                    if (!product) return null;
+                                    return (
+                                    <Chip
+                                        key={productIdStr}
+                                        label={`${product.title || product.name} ($${product.price})`}
+                                        size="small"
+                                        sx={{
+                                          backgroundColor: 'rgba(11, 120, 151, 0.1)',
+                                          color: '#0B7897',
+                                          fontWeight: 500,
+                                        }}
+                                      />
+                                    );
+                                  })
+                                )}
+                              </Box>
+                            )}
+                            MenuProps={{
+                              PaperProps: {
+                                style: {
+                                  maxHeight: 300,
+                                  width: 'auto',
+                                },
+                              },
+                            }}
+                          >
+                            {filteredProductsForSelection.length === 0 ? (
+                              <MenuItem disabled>No private products available for selected entity</MenuItem>
                             ) : (
-                              selected.map((productIdStr) => {
-                                const product = allProducts.find((p) => {
-                                  const pId = p._id?.toString ? p._id.toString() : String(p._id);
-                                  return pId === productIdStr && p.visibility === 'private';
-                                });
-                                if (!product) return null;
+                              filteredProductsForSelection.map((product) => {
+                                const productId = product._id?.toString ? product._id.toString() : String(product._id);
                                 return (
-                                  <Chip
-                                    key={productIdStr}
-                                    label={`${product.name} ($${product.price})`}
-                                    size="small"
-                                    sx={{
-                                      backgroundColor: 'rgba(11, 120, 151, 0.1)',
-                                      color: '#0B7897',
-                                      fontWeight: 500,
-                                    }}
-                                  />
+                                  <MenuItem key={product._id} value={productId}>
+                                    <Box display="flex" alignItems="center" gap={1} flexWrap="wrap" sx={{ width: '100%' }}>
+                                      <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                        {product.title || product.name || 'Untitled Product'}
+                                      </Typography>
+                                      <Chip
+                                        label={product.visibility === 'private' ? 'Private' : 'Public'}
+                                        size="small"
+                                        sx={{
+                                          backgroundColor: product.visibility === 'private'
+                                            ? 'rgba(255, 152, 0, 0.1)'
+                                            : 'rgba(76, 175, 80, 0.1)',
+                                          color: product.visibility === 'private'
+                                            ? '#FF9800'
+                                            : '#4CAF50',
+                                          fontSize: '0.7rem',
+                                          height: '20px',
+                                        }}
+                                      />
+                                      <Typography variant="caption" color="text.secondary">
+                                        ${product.price}
+                                      </Typography>
+                                    </Box>
+                                  </MenuItem>
                                 );
                               })
                             )}
-                          </Box>
-                        )}
-                        MenuProps={{
-                          PaperProps: {
-                            style: {
-                              maxHeight: 300,
-                              width: 'auto',
-                            },
-                          },
-                        }}
-                      >
-                        {allProducts.filter(p => p.visibility === 'private').length === 0 ? (
-                          <MenuItem disabled>No private products available</MenuItem>
-                        ) : (
-                          allProducts.filter(p => p.visibility === 'private').map((product) => {
-                            const productId = product._id?.toString ? product._id.toString() : String(product._id);
-                            return (
-                              <MenuItem key={product._id} value={productId}>
-                                <Box display="flex" alignItems="center" gap={1} flexWrap="wrap" sx={{ width: '100%' }}>
-                                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                                    {product.name || 'Untitled Product'}
-                                  </Typography>
-                                  <Chip
-                                    label={product.visibility === 'private' ? 'Private' : 'Public'}
-                                    size="small"
-                                    sx={{
-                                      backgroundColor: product.visibility === 'private'
-                                        ? 'rgba(255, 152, 0, 0.1)'
-                                        : 'rgba(76, 175, 80, 0.1)',
-                                      color: product.visibility === 'private'
-                                        ? '#FF9800'
-                                        : '#4CAF50',
-                                      fontSize: '0.7rem',
-                                      height: '20px',
-                                    }}
-                                  />
-                                  <Typography variant="caption" color="text.secondary">
-                                    ${product.price}
-                                  </Typography>
-                                </Box>
-                              </MenuItem>
-                            );
-                          })
-                        )}
-                      </Select>
-                    </FormControl>
+                          </Select>
+                        </FormControl>
+                      );
+                    })()
                   )}
                   
                   <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>

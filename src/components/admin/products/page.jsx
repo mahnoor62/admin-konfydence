@@ -737,7 +737,7 @@
 'use client';
 export const dynamic = 'force-dynamic';
 import AdminLayout from '@/components/AdminLayout';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import {
   Box,
   Typography,
@@ -883,6 +883,22 @@ function ProductsContent() {
     severity: 'success',
   });
   const [visibilityFilter, setVisibilityFilter] = useState('all'); // 'all', 'public', 'private'
+  const [customRequestsForProducts, setCustomRequestsForProducts] = useState([]);
+  const [loadingCustomRequests, setLoadingCustomRequests] = useState(false);
+  const [linkedRequestCardIds, setLinkedRequestCardIds] = useState([]);
+  // Debug: log linked request cards to help troubleshoot filtering
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      console.log('DEBUG: linkedRequestCardIds updated ->', linkedRequestCardIds);
+    }
+  }, [linkedRequestCardIds]);
+
+  // derive actual card objects for linked request using useMemo for stability
+  const linkedRequestCards = useMemo(() => {
+    if (!linkedRequestCardIds || linkedRequestCardIds.length === 0) return [];
+    const idSet = new Set(linkedRequestCardIds.map(id => String(id)));
+    return allCards.filter(c => idSet.has(String(c._id)));
+  }, [linkedRequestCardIds, allCards]);
 
   // --------- FETCH HELPERS (simple axios) ----------
 
@@ -1140,11 +1156,29 @@ function ProductsContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // When allowed organizations or institutes change (private product), load related cards
+  useEffect(() => {
+    if (formData.visibility === 'private') {
+      const orgs = formData.allowedOrganizations || [];
+      const insts = formData.allowedInstitutes || [];
+      if ((orgs && orgs.length > 0) || (insts && insts.length > 0)) {
+        loadCardsForEntities(orgs, insts);
+      } else {
+        // Clear linkedRequestCardIds when no entities selected
+        setLinkedRequestCardIds([]);
+      }
+    }
+  }, [formData.allowedOrganizations, formData.allowedInstitutes, formData.visibility]);
+
   // --------- DIALOG / FORM HANDLERS ----------
 
   const handleOpen = (product) => {
     if (product) {
       setEditing(product);
+      // normalize linkedCustomRequestId (could be populated object)
+      const linkedReqId = product.linkedCustomRequestId
+        ? (product.linkedCustomRequestId._id ? String(product.linkedCustomRequestId._id) : String(product.linkedCustomRequestId))
+        : '';
       setFormData({
         name: product.name,
         description: product.description,
@@ -1168,7 +1202,12 @@ function ProductsContent() {
         level1: product.level1?.map(card => typeof card === 'object' ? card._id : card) || [],
         level2: product.level2?.map(card => typeof card === 'object' ? card._id : card) || [],
         level3: product.level3?.map(card => typeof card === 'object' ? card._id : card) || [],
+        linkedCustomRequestId: linkedReqId
       });
+      // load custom requests (include selected one) if product is private
+      if (product.visibility === 'private') {
+        loadCustomRequestsForProducts(linkedReqId || undefined);
+      }
     } else {
       setEditing(null);
       setFormData({
@@ -1188,6 +1227,7 @@ function ProductsContent() {
         level1: [],
         level2: [],
         level3: [],
+        linkedCustomRequestId: ''
       });
     }
     setAccessTab(0); // Reset to Organizations tab
@@ -1352,6 +1392,90 @@ function ProductsContent() {
     }
   };
 
+  // Load custom package requests for products admin form.
+  // If selectedId provided, ensure it's included in the list.
+  const loadCustomRequestsForProducts = async (selectedId) => {
+    try {
+      setLoadingCustomRequests(true);
+      const headers = getAuthHeaders();
+      const url = `${API_URL}/custom-package-requests`;
+      const resp = await axios.get(url, { headers });
+      let items = Array.isArray(resp.data) ? resp.data : resp.data?.requests || [];
+      // Filter to active/visible requests (same logic as backend)
+      const filtered = items.filter(it => !(it.status === 'completed' && !it.customPackageId));
+
+      // If selectedId not in filtered, fetch it specifically and prepend
+              if (selectedId && !filtered.find(it => String(it._id) === String(selectedId))) {
+        try {
+          const single = await axios.get(`${API_URL}/custom-package-requests/${selectedId}`, { headers });
+          if (single?.data) {
+            filtered.unshift(single.data);
+              // set linked request card ids if available (normalize to strings)
+              const cardsToAdd = single.data.requestedModifications?.cardsToAdd || [];
+              const cardIds = cardsToAdd.map(c => {
+                const id = c?._id || c;
+                return id?.toString ? id.toString() : String(id);
+              });
+              setLinkedRequestCardIds(cardIds);
+          }
+        } catch (err) {
+          console.warn('Could not fetch selected custom request:', selectedId, err?.message || err);
+        }
+      }
+
+              setCustomRequestsForProducts(filtered);
+              if (typeof window !== 'undefined') {
+                console.log('DEBUG: loaded custom requests for products, count=', filtered.length, 'selectedId=', selectedId);
+              }
+    } catch (err) {
+      console.error('Failed to load custom package requests for products:', err);
+      setCustomRequestsForProducts([]);
+    } finally {
+      setLoadingCustomRequests(false);
+    }
+  };
+
+  // Load cards for selected organizations/schools by fetching their custom package requests
+  const loadCardsForEntities = async (orgIds = [], schoolIds = []) => {
+    try {
+      const headers = getAuthHeaders();
+      const collected = new Set();
+
+      // Helper to fetch requests for a single org or school id
+      const fetchForId = async (type, id) => {
+        try {
+          const url = `${API_URL}/custom-package-requests?${type}=${encodeURIComponent(id)}`;
+          const resp = await axios.get(url, { headers });
+          const items = Array.isArray(resp.data) ? resp.data : resp.data?.requests || [];
+          items.forEach(it => {
+            const cards = it.requestedModifications?.cardsToAdd || [];
+            cards.forEach(c => {
+              const cid = c?._id || c;
+              if (cid) collected.add(cid.toString ? cid.toString() : String(cid));
+            });
+          });
+        } catch (err) {
+          console.warn('Failed to fetch requests for', type, id, err?.message || err);
+        }
+      };
+
+      // Fetch for all orgIds and schoolIds in parallel
+      await Promise.all([
+        ...orgIds.map(id => fetchForId('organizationId', id)),
+        ...schoolIds.map(id => fetchForId('schoolId', id))
+      ]);
+
+      const ids = Array.from(collected);
+      setLinkedRequestCardIds(ids);
+      if (typeof window !== 'undefined') {
+        console.log('DEBUG: loadCardsForEntities -> linkedRequestCardIds=', ids);
+      }
+    } catch (err) {
+      console.error('Error loading cards for entities', err);
+      setLinkedRequestCardIds([]);
+    }
+  };
+
   const handleClose = () => {
     setOpen(false);
     setEditing(null);
@@ -1456,6 +1580,7 @@ function ProductsContent() {
         level1: formData.level1 || [],
         level2: formData.level2 || [],
         level3: formData.level3 || [],
+        linkedCustomRequestId: formData.visibility === 'private' ? (formData.linkedCustomRequestId || '') : '',
       };
 
       const headers = getAuthHeaders();
@@ -1764,10 +1889,11 @@ function ProductsContent() {
         >
           <Table stickyHeader>
             <TableHead>
-              <TableRow>
+                <TableRow>
                 <TableCell>Image</TableCell>
                 <TableCell>Name</TableCell>
                 <TableCell>Cards</TableCell>
+                <TableCell>Linked Request</TableCell>
                 <TableCell>Target Audience</TableCell>
                 <TableCell>Price</TableCell>
                 <TableCell>Visibility</TableCell>
@@ -1834,9 +1960,9 @@ function ProductsContent() {
                           />
                         ) : (
                           <Box
-                            sx={{
-                              width: 60,
-                              height: 60,
+                          sx={{
+                              width: 48,
+                              height: 48,
                               backgroundColor: 'rgba(0,0,0,0.05)',
                               borderRadius: 1,
                               display: 'flex',
@@ -1876,6 +2002,15 @@ function ProductsContent() {
                             </Typography>
                           );
                         })()}
+                      </TableCell>
+                      <TableCell>
+                        {product.linkedCustomRequestId ? (
+                          <Typography variant="body2">
+                            {product.linkedCustomRequestId.organizationName || product.linkedCustomRequestId.contactName || (`Request ${String(product.linkedCustomRequestId._id || product.linkedCustomRequestId).slice(-6)}`)}
+                          </Typography>
+                        ) : (
+                          <Typography variant="caption" color="text.secondary">-</Typography>
+                        )}
                       </TableCell>
                       <TableCell>
                         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
@@ -2169,7 +2304,14 @@ function ProductsContent() {
                   labelId="visibility-label"
                   value={formData.visibility}
                   onChange={(e) =>
-                    setFormData({ ...formData, visibility: e.target.value })
+                    {
+                      const v = e.target.value;
+                      setFormData({ ...formData, visibility: v });
+                      // If switching to private, load available custom package requests
+                      if (v === 'private') {
+                        loadCustomRequestsForProducts();
+                      }
+                    }
                   }
                   input={<OutlinedInput label="Visibility" />}
                 >
@@ -2182,6 +2324,55 @@ function ProductsContent() {
                     : 'This product will only be visible to selected organizations/institutes.'}
                 </Typography>
               </FormControl>
+
+              {/* When product is private, allow linking an existing custom package request */}
+              {formData.visibility === 'private' && (
+                <Box sx={{ mt: 2 }}>
+                  <Autocomplete
+                    options={customRequestsForProducts}
+                    getOptionLabel={(opt) => opt ? (opt.organizationName || opt.contactName || (`Request ${String(opt._id).slice(-6)}`)) : ''}
+                    value={customRequestsForProducts.find(r => String(r._id) === String(formData.linkedCustomRequestId)) || null}
+                    onChange={async (e, newVal) => {
+                      console.log('DEBUG: Autocomplete selected newVal=', newVal);
+                      const id = newVal ? String(newVal._id) : '';
+                      setFormData({ ...formData, linkedCustomRequestId: id });
+                      if (id) {
+                        // fetch request details and prefill level1 cards from requestedModifications.cardsToAdd
+                        try {
+                          const headers = getAuthHeaders();
+                          const resp = await axios.get(`${API_URL}/custom-package-requests/${id}/cards`, { headers });
+                          const cards = Array.isArray(resp.data) ? resp.data : [];
+                          const cardIds = cards.map(c => {
+                            const cid = c?._id || c;
+                            return cid?.toString ? cid.toString() : String(cid);
+                          });
+                          // Prefill level1 with these cards (admin can adjust levels after)
+                          setFormData(prev => ({ ...prev, level1: cardIds }));
+                          // ensure level selectors show only linked request cards
+                          setLinkedRequestCardIds(cardIds);
+                        } catch (err) {
+                          console.error('Failed to load custom request details', err, err.response?.data || err.message);
+                        }
+                      } else {
+                        // clear any linked request restrictions when deselected
+                        setLinkedRequestCardIds([]);
+                        setFormData(prev => ({ ...prev, level1: [], level2: [], level3: [], linkedCustomRequestId: '' }));
+                      }
+                    }}
+                    renderInput={(params) => (
+                      <TextField
+                        {...params}
+                        label="Link to Custom Package Request"
+                        placeholder="Select request..."
+                        helperText="Select a custom package request — related cards will be prefilled"
+                        fullWidth
+                      />
+                    )}
+                    isOptionEqualToValue={(o,v) => String(o._id) === String(v._id)}
+                    loading={loadingCustomRequests}
+                  />
+                </Box>
+              )}
 
               {/* Commented out Private Access Selection */}
               {/* {formData.visibility === 'private' && (
@@ -2438,22 +2629,28 @@ function ProductsContent() {
                     <Grid item xs={12} md={4}>
                       <Autocomplete
                         multiple
-                        options={allCards.filter(card => {
-                          // Filter cards by target audience
-                          if (!card.targetAudiences || card.targetAudiences.length === 0) return false;
-                          const targetMap = {
-                            'private-users': 'B2C',
-                            'schools': 'B2E',
-                            'businesses': 'B2B'
-                          };
-                          const selectedTargets = Array.isArray(formData.targetAudience) ? formData.targetAudience : [formData.targetAudience];
-                          const targetValues = selectedTargets.map(ta => targetMap[ta]).filter(Boolean);
-                          return targetValues.some(tv => card.targetAudiences.includes(tv));
-                        })}
+                        options={ formData.linkedCustomRequestId
+                          ? linkedRequestCards
+                          : allCards.filter(card => {
+                            // Filter cards by target audience
+                            if (!card.targetAudiences || card.targetAudiences.length === 0) return false;
+                            const targetMap = {
+                              'private-users': 'B2C',
+                              'schools': 'B2E',
+                              'businesses': 'B2B'
+                            };
+                            const selectedTargets = Array.isArray(formData.targetAudience) ? formData.targetAudience : [formData.targetAudience];
+                            const targetValues = selectedTargets.map(ta => targetMap[ta]).filter(Boolean);
+                            return targetValues.some(tv => card.targetAudiences.includes(tv));
+                          })
+                        }
                         getOptionLabel={(option) => option.title || 'Untitled Card'}
                         value={(formData.level1 || []).map(id => allCards.find(card => card._id === id)).filter(Boolean)}
                         onChange={(event, newValue) => {
-                          setFormData({ ...formData, level1: newValue.map(card => card._id) });
+                          const ids = newValue.map(card => card._id);
+                          setFormData({ ...formData, level1: ids });
+                          // if linked request not set, allow manual selection; still clear linkedRequestCardIds
+                          if (!formData.linkedCustomRequestId) setLinkedRequestCardIds([]);
                         }}
                         isOptionEqualToValue={(option, value) => option._id === value._id}
                         disabled={loadingCards}
@@ -2492,29 +2689,37 @@ function ProductsContent() {
                           ))
                         }
                         loading={loadingCards}
-                        noOptionsText="No cards available for selected target audience(s)"
+                        noOptionsText={ formData.linkedCustomRequestId && linkedRequestCards.length === 0
+                          ? 'No cards created for selected request'
+                          : 'No cards available for selected target audience(s)'
+                        }
                       />
                     </Grid>
 
                     <Grid item xs={12} md={4}>
                       <Autocomplete
                         multiple
-                        options={allCards.filter(card => {
-                          // Filter cards by target audience
-                          if (!card.targetAudiences || card.targetAudiences.length === 0) return false;
-                          const targetMap = {
-                            'private-users': 'B2C',
-                            'schools': 'B2E',
-                            'businesses': 'B2B'
-                          };
-                          const selectedTargets = Array.isArray(formData.targetAudience) ? formData.targetAudience : [formData.targetAudience];
-                          const targetValues = selectedTargets.map(ta => targetMap[ta]).filter(Boolean);
-                          return targetValues.some(tv => card.targetAudiences.includes(tv));
-                        })}
+                        options={ formData.linkedCustomRequestId
+                          ? linkedRequestCards
+                          : allCards.filter(card => {
+                            // Filter cards by target audience
+                            if (!card.targetAudiences || card.targetAudiences.length === 0) return false;
+                            const targetMap = {
+                              'private-users': 'B2C',
+                              'schools': 'B2E',
+                              'businesses': 'B2B'
+                            };
+                            const selectedTargets = Array.isArray(formData.targetAudience) ? formData.targetAudience : [formData.targetAudience];
+                            const targetValues = selectedTargets.map(ta => targetMap[ta]).filter(Boolean);
+                            return targetValues.some(tv => card.targetAudiences.includes(tv));
+                          })
+                        }
                         getOptionLabel={(option) => option.title || 'Untitled Card'}
                         value={(formData.level2 || []).map(id => allCards.find(card => card._id === id)).filter(Boolean)}
                         onChange={(event, newValue) => {
-                          setFormData({ ...formData, level2: newValue.map(card => card._id) });
+                          const ids = newValue.map(card => card._id);
+                          setFormData({ ...formData, level2: ids });
+                          if (!formData.linkedCustomRequestId) setLinkedRequestCardIds([]);
                         }}
                         isOptionEqualToValue={(option, value) => option._id === value._id}
                         disabled={loadingCards}
@@ -2553,29 +2758,37 @@ function ProductsContent() {
                           ))
                         }
                         loading={loadingCards}
-                        noOptionsText="No cards available for selected target audience(s)"
+                        noOptionsText={ formData.linkedCustomRequestId && linkedRequestCards.length === 0
+                          ? 'No cards created for selected request'
+                          : 'No cards available for selected target audience(s)'
+                        }
                       />
                     </Grid>
 
                     <Grid item xs={12} md={4}>
                       <Autocomplete
                         multiple
-                        options={allCards.filter(card => {
-                          // Filter cards by target audience
-                          if (!card.targetAudiences || card.targetAudiences.length === 0) return false;
-                          const targetMap = {
-                            'private-users': 'B2C',
-                            'schools': 'B2E',
-                            'businesses': 'B2B'
-                          };
-                          const selectedTargets = Array.isArray(formData.targetAudience) ? formData.targetAudience : [formData.targetAudience];
-                          const targetValues = selectedTargets.map(ta => targetMap[ta]).filter(Boolean);
-                          return targetValues.some(tv => card.targetAudiences.includes(tv));
-                        })}
+                        options={ formData.linkedCustomRequestId
+                          ? linkedRequestCards
+                          : allCards.filter(card => {
+                            // Filter cards by target audience
+                            if (!card.targetAudiences || card.targetAudiences.length === 0) return false;
+                            const targetMap = {
+                              'private-users': 'B2C',
+                              'schools': 'B2E',
+                              'businesses': 'B2B'
+                            };
+                            const selectedTargets = Array.isArray(formData.targetAudience) ? formData.targetAudience : [formData.targetAudience];
+                            const targetValues = selectedTargets.map(ta => targetMap[ta]).filter(Boolean);
+                            return targetValues.some(tv => card.targetAudiences.includes(tv));
+                          })
+                        }
                         getOptionLabel={(option) => option.title || 'Untitled Card'}
                         value={(formData.level3 || []).map(id => allCards.find(card => card._id === id)).filter(Boolean)}
                         onChange={(event, newValue) => {
-                          setFormData({ ...formData, level3: newValue.map(card => card._id) });
+                          const ids = newValue.map(card => card._id);
+                          setFormData({ ...formData, level3: ids });
+                          if (!formData.linkedCustomRequestId) setLinkedRequestCardIds([]);
                         }}
                         isOptionEqualToValue={(option, value) => option._id === value._id}
                         disabled={loadingCards}
@@ -2614,7 +2827,10 @@ function ProductsContent() {
                           ))
                         }
                         loading={loadingCards}
-                        noOptionsText="No cards available for selected target audience(s)"
+                        noOptionsText={ formData.linkedCustomRequestId && linkedRequestCards.length === 0
+                          ? 'No cards created for selected request'
+                          : 'No cards available for selected target audience(s)'
+                        }
                       />
                     </Grid>
                   </Grid>
@@ -2910,14 +3126,6 @@ function ProductsContent() {
                       {viewingProduct.name}
                     </Typography>
                   </Grid>
-                  <Grid item xs={12}>
-                    <Typography variant="subtitle2" color="text.secondary">
-                      Description
-                    </Typography>
-                    <Typography variant="body1" sx={{ mb: 2 }}>
-                      {viewingProduct.description || 'N/A'}
-                    </Typography>
-                  </Grid>
                   <Grid item xs={12} sm={6}>
                     <Typography variant="subtitle2" color="text.secondary">
                       Price
@@ -2926,22 +3134,7 @@ function ProductsContent() {
                       ${viewingProduct.price}
                     </Typography>
                   </Grid>
-                  <Grid item xs={12} sm={6}>
-                    <Typography variant="subtitle2" color="text.secondary">
-                      Type
-                    </Typography>
-                    <Typography variant="body1" sx={{ mb: 2 }}>
-                      {viewingProduct.type || 'N/A'}
-                    </Typography>
-                  </Grid>
-                  <Grid item xs={12} sm={6}>
-                    <Typography variant="subtitle2" color="text.secondary">
-                      Category
-                    </Typography>
-                    <Typography variant="body1" sx={{ mb: 2 }}>
-                      {viewingProduct.category || 'N/A'}
-                    </Typography>
-                  </Grid>
+                  {/* Removed Description, Type, Category as requested */}
                   <Grid item xs={12} sm={6}>
                     <Typography variant="subtitle2" color="text.secondary">
                       Target Audience
@@ -2984,17 +3177,17 @@ function ProductsContent() {
                   </Grid>
                   <Grid item xs={12}>
                     <Typography variant="subtitle2" color="text.secondary" sx={{ fontWeight: 'bold', mb: 1 }}>
-                      Cards by Level
+                      Cards by Environment
                     </Typography>
                     <Box sx={{ mb: 2 }}>
                       <Typography variant="body2" sx={{ mb: 1 }}>
-                        <strong>Level 1:</strong> {viewingProduct.level1?.length || 0} cards
+                        <strong>Environment 1:</strong> {viewingProduct.level1?.length || 0} cards
                       </Typography>
                       <Typography variant="body2" sx={{ mb: 1 }}>
-                        <strong>Level 2:</strong> {viewingProduct.level2?.length || 0} cards
+                        <strong>Environment 2:</strong> {viewingProduct.level2?.length || 0} cards
                       </Typography>
                       <Typography variant="body2" sx={{ mb: 1 }}>
-                        <strong>Level 3:</strong> {viewingProduct.level3?.length || 0} cards
+                        <strong>Environment 3:</strong> {viewingProduct.level3?.length || 0} cards
                       </Typography>
                       {viewingProduct.cardIds && viewingProduct.cardIds.length > 0 && (
                         <Typography variant="body2" sx={{ mb: 1, color: 'text.secondary' }}>
@@ -3023,7 +3216,7 @@ function ProductsContent() {
                         alt={viewingProduct.name}
                         sx={{
                           width: '100%',
-                          maxWidth: 400,
+                          maxWidth: 200,
                           height: 'auto',
                           borderRadius: 1,
                           mt: 1,
@@ -3108,13 +3301,13 @@ function ProductsContent() {
                     (viewingProduct.level2 && viewingProduct.level2.length > 0) ||
                     (viewingProduct.level3 && viewingProduct.level3.length > 0)) && (
                     <Grid item xs={12}>
-                      <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
-                        Cards by Level
+                    <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
+                        Cards by Environment
                       </Typography>
                       {viewingProduct.level1 && viewingProduct.level1.length > 0 && (
                         <Box sx={{ mb: 2 }}>
                           <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
-                            Level 1: {viewingProduct.level1.length} card{viewingProduct.level1.length !== 1 ? 's' : ''}
+                            Environment 1: {viewingProduct.level1.length} card{viewingProduct.level1.length !== 1 ? 's' : ''}
                           </Typography>
                           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
                             {viewingProduct.level1.map((card, index) => {
@@ -3138,7 +3331,7 @@ function ProductsContent() {
                       {viewingProduct.level2 && viewingProduct.level2.length > 0 && (
                         <Box sx={{ mb: 2 }}>
                           <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
-                            Level 2: {viewingProduct.level2.length} card{viewingProduct.level2.length !== 1 ? 's' : ''}
+                            Environment 2: {viewingProduct.level2.length} card{viewingProduct.level2.length !== 1 ? 's' : ''}
                           </Typography>
                           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
                             {viewingProduct.level2.map((card, index) => {
@@ -3162,7 +3355,7 @@ function ProductsContent() {
                       {viewingProduct.level3 && viewingProduct.level3.length > 0 && (
                         <Box sx={{ mb: 2 }}>
                           <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
-                            Level 3: {viewingProduct.level3.length} card{viewingProduct.level3.length !== 1 ? 's' : ''}
+                            Environment 3: {viewingProduct.level3.length} card{viewingProduct.level3.length !== 1 ? 's' : ''}
                           </Typography>
                           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
                             {viewingProduct.level3.map((card, index) => {
