@@ -1031,9 +1031,11 @@ export default function Cards() {
                                 scrollbarWidth: 'thin',
                                 scrollbarColor: 'rgba(255,178,0,0.9) rgba(255,255,255,0.02)'
                               }}>
-                              <Typography variant="h6" sx={{ fontWeight: 800, mb: 1, letterSpacing: 0.6 }}>{viewingCard.title}</Typography>
+                              <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 1, color: '#fff' }}>{viewingCard.title}</Typography>
                               <Divider sx={{ borderColor: 'rgba(255,178,0,0.5)', my: 2 }} />
                               <Typography variant="body1" sx={{ mb: 2 }}>{questionDesc}</Typography>
+                              {/* Divider after question and before options */}
+                              <Divider sx={{ borderColor: 'rgba(255,178,0,0.35)', my: 2 }} />
                               <Box sx={{ textAlign: 'left', mt: 2 }}>
                                 {(question.answers || []).map((ans, i) => (
                                   <Box key={i} sx={{ display: 'flex', alignItems: 'flex-start', gap: 1, mb: 1 }}>
@@ -1046,6 +1048,14 @@ export default function Cards() {
                                   </Box>
                                 ))}
                               </Box>
+                              {/* Small footer at the bottom of the front card (match back card) */}
+                              <Box sx={{ mt: 3, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
+                                <img src="/logo.png" alt="Konfydence" style={{ height: 20, filter: 'drop-shadow(0 1px 0 rgba(0,0,0,0.2))' }} />
+                                <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.85)' }}>
+                                  Konfydence — Outsmart Scams, Together!
+                                </Typography>
+                              </Box>
+                              {/* End of front card content */}
                             </Box>
                           </Box>
                         </Grid>
@@ -1071,6 +1081,12 @@ export default function Cards() {
                             <Box sx={{ textAlign: 'center', mb: 1 }}>
                               <img src="/logo.png" alt="Konfydence" style={{ height: 36, filter: 'drop-shadow(0 1px 0 rgba(0,0,0,0.2))' }} />
                             </Box>
+                            {/* Show card title on back card for parity with front */}
+                            {viewingCard?.title && (
+                              <Box sx={{ textAlign: 'center', mb: 1 }}>
+                                <Typography variant="subtitle1" sx={{ fontWeight: 700, color: '#fff' }}>{viewingCard.title}</Typography>
+                              </Box>
+                            )}
                             <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', overflowY: 'auto', pr: 1,
                                 '&::-webkit-scrollbar': { width: 8 },
                                 '&::-webkit-scrollbar-thumb': { backgroundColor: 'rgba(255,178,0,0.9)', borderRadius: 4 },
@@ -1100,17 +1116,18 @@ export default function Cards() {
 
                               <Divider sx={{ my: 2, borderColor: 'rgba(255,178,0,0.35)' }} />
 
-                              {/* Attachments */}
-                              <Typography variant="subtitle2" sx={{ color: '#FFD27A' }}>Attachments</Typography>
-                              {question.attachments && question.attachments.length > 0 ? (
-                                question.attachments.map((att, idx) => (
-                                  <Box key={idx} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 1, p: 1, bgcolor: 'rgba(255,255,255,0.06)', borderRadius: 1 }}>
-                                    <Typography variant="body2" sx={{ color: '#fff' }}>{att.title || att.url}</Typography>
-                                    <Button size="small" href={att.url} target="_blank" rel="noopener noreferrer">Open</Button>
-                                  </Box>
-                                ))
-                              ) : (
-                                <Typography variant="body2" color="rgba(255,255,255,0.8)" sx={{ mt: 1 }}>No attachments</Typography>
+                              {/* Attachments - only show if there are attachments */}
+                              {question.attachments && question.attachments.length > 0 && (
+                                <>
+                                  <Typography variant="subtitle2" sx={{ color: '#FFD27A' }}>Attachments</Typography>
+                                  {question.attachments.map((att, idx) => (
+                                    <Box key={idx} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 1, p: 1, bgcolor: 'rgba(255,255,255,0.06)', borderRadius: 1 }}>
+                                      <Typography variant="body2" sx={{ color: '#fff' }}>{att.title || att.url}</Typography>
+                                      <Button size="small" href={att.url} target="_blank" rel="noopener noreferrer">Open</Button>
+                                    </Box>
+                                  ))}
+                                  <Divider sx={{ my: 2, borderColor: 'rgba(255,178,0,0.35)' }} />
+                                </>
                               )}
 
                               {/* Small footer at the bottom of the back card */}
