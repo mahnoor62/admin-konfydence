@@ -100,6 +100,7 @@ export default function LeadDetail() {
   const [complianceTags, setComplianceTags] = useState([]);
   const [evidenceDialogOpen, setEvidenceDialogOpen] = useState(false);
   const [viewDetailsOpen, setViewDetailsOpen] = useState(false);
+  const [showAllMessages, setShowAllMessages] = useState(false);
   const [evidenceData, setEvidenceData] = useState({
     engagementEvidence: '',
     evidenceDate: '',
@@ -612,14 +613,37 @@ export default function LeadDetail() {
                       </Typography>
                     </Grid>
                   )}
-                  {lead.message && (
+                  {(lead.message || (lead.messages && lead.messages.length > 0)) && (
                     <Grid item xs={12}>
                       <Typography variant="caption" color="text.secondary">
-                        Message
+                        {lead.messages && lead.messages.length > 1 ? `Messages (${lead.messages.length})` : 'Message'}
                       </Typography>
                       <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
                         {lead.message}
                       </Typography>
+                      {lead.messages && lead.messages.length > 1 && (
+                        <Button
+                          size="small"
+                          onClick={() => setShowAllMessages((p) => !p)}
+                          sx={{ mt: 1 }}
+                        >
+                          {showAllMessages ? 'Hide all messages' : `View all ${lead.messages.length} messages`}
+                        </Button>
+                      )}
+                      {showAllMessages && lead.messages && lead.messages.length > 0 && (
+                        <Stack spacing={1.5} sx={{ mt: 2, pl: 1, borderLeft: 2, borderColor: 'divider' }}>
+                          {lead.messages.map((m, i) => (
+                            <Box key={i}>
+                              <Typography variant="caption" color="text.secondary">
+                                {m.topic || 'Message'} · {m.createdAt ? new Date(m.createdAt).toLocaleString() : ''}
+                              </Typography>
+                              <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                                {m.text}
+                              </Typography>
+                            </Box>
+                          ))}
+                        </Stack>
+                      )}
                     </Grid>
                   )}
                 </Grid>
@@ -1585,14 +1609,37 @@ export default function LeadDetail() {
                 <Divider sx={{ mb: 2 }} />
               </Grid>
               
-              {lead.message && (
+              {(lead.message || (lead.messages && lead.messages.length > 0)) && (
                 <Grid item xs={12}>
                   <Typography variant="caption" color="text.secondary">
-                    Message
+                    {lead.messages && lead.messages.length > 1 ? `Messages (${lead.messages.length})` : 'Message'}
                   </Typography>
                   <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', mt: 1 }}>
                     {lead.message}
                   </Typography>
+                  {lead.messages && lead.messages.length > 1 && (
+                    <Button
+                      size="small"
+                      onClick={() => setShowAllMessages((p) => !p)}
+                      sx={{ mt: 1 }}
+                    >
+                      {showAllMessages ? 'Hide all messages' : `View all ${lead.messages.length} messages`}
+                    </Button>
+                  )}
+                  {showAllMessages && lead.messages && lead.messages.length > 0 && (
+                    <Stack spacing={1.5} sx={{ mt: 2, pl: 1, borderLeft: 2, borderColor: 'divider' }}>
+                      {lead.messages.map((m, i) => (
+                        <Box key={i}>
+                          <Typography variant="caption" color="text.secondary">
+                            {m.topic || 'Message'} · {m.createdAt ? new Date(m.createdAt).toLocaleString() : ''}
+                          </Typography>
+                          <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                            {m.text}
+                          </Typography>
+                        </Box>
+                      ))}
+                    </Stack>
+                  )}
                 </Grid>
               )}
               

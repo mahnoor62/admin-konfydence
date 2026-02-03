@@ -46,6 +46,7 @@ import {
   AttachMoney,
   PlayArrow,
   Delete as DeleteIcon,
+  Message as MessageIcon,
 } from '@mui/icons-material';
 import axios from 'axios';
 
@@ -89,6 +90,8 @@ export default function Leads() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [leadToDelete, setLeadToDelete] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  const [messagesDialogOpen, setMessagesDialogOpen] = useState(false);
+  const [leadForMessages, setLeadForMessages] = useState(null);
   const [convertForm, setConvertForm] = useState({
     name: '',
     type: '',
@@ -132,8 +135,32 @@ export default function Leads() {
   }, [statusFilter, segmentFilter, searchQuery]);
 
   const handleViewDetail = (leadId) => {
-    // Navigate to detail page
     router.push(`/leads/${leadId}`);
+  };
+
+  const getUnreadMessageCount = (lead) => {
+    if (lead.messages && lead.messages.length > 0) {
+      const readAt = lead.messagesReadAt ? new Date(lead.messagesReadAt).getTime() : 0;
+      return lead.messages.filter((m) => new Date(m.createdAt).getTime() > readAt).length;
+    }
+    if (lead.message) return lead.messagesReadAt ? 0 : 1;
+    return 0;
+  };
+
+  const handleOpenMessages = async (lead, e) => {
+    if (e) e.stopPropagation();
+    setLeadForMessages(lead);
+    setMessagesDialogOpen(true);
+    if (!lead._id) return;
+    try {
+      const api = getApiInstance();
+      await api.put(`/leads/unified/${lead._id}`, { messagesReadAt: new Date().toISOString() });
+      setLeads((prev) =>
+        prev.map((l) => (l._id === lead._id ? { ...l, messagesReadAt: new Date().toISOString() } : l))
+      );
+    } catch (err) {
+      console.error('Error marking messages as read:', err);
+    }
   };
 
   const handleStatusChange = async (leadId, newStatus) => {
@@ -673,7 +700,44 @@ export default function Leads() {
                     {new Date(lead.createdAt).toLocaleDateString()}
                   </TableCell>
                   <TableCell>
-                    <IconButton size="small" onClick={(e) => { e.stopPropagation(); handleViewDetail(lead._id); }}>
+                    {((lead.messages && lead.messages.length > 0) || lead.message) && (
+                      <IconButton
+                        size="small"
+                        sx={{ position: 'relative' }}
+                        onClick={(e) => handleOpenMessages(lead, e)}
+                        title={
+                          getUnreadMessageCount(lead) > 0
+                            ? `${getUnreadMessageCount(lead)} unread — View messages`
+                            : 'View messages'
+                        }
+                        color="primary"
+                      >
+                        <MessageIcon />
+                        {getUnreadMessageCount(lead) > 0 && (
+                          <Box
+                            component="span"
+                            sx={{
+                              position: 'absolute',
+                              top: 2,
+                              right: 2,
+                              minWidth: 14,
+                              height: 14,
+                              borderRadius: '50%',
+                              bgcolor: 'error.main',
+                              color: 'white',
+                              fontSize: 10,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              lineHeight: 1,
+                            }}
+                          >
+                            {getUnreadMessageCount(lead)}
+                          </Box>
+                        )}
+                      </IconButton>
+                    )}
+                    <IconButton size="small" onClick={(e) => { e.stopPropagation(); handleViewDetail(lead._id); }} title="View details">
                       <Visibility />
                     </IconButton>
                     <IconButton 
@@ -891,11 +955,11 @@ export default function Leads() {
                   />
                 </Grid>
               )}
-              {selectedLead.message && (
+              {(selectedLead.message || (selectedLead.messages && selectedLead.messages.length > 0)) && (
                 <Grid item xs={12}>
                   <TextField
                     fullWidth
-                    label="Message"
+                    label={selectedLead.messages && selectedLead.messages.length > 1 ? `Message (latest of ${selectedLead.messages.length})` : 'Message'}
                     multiline
                     rows={4}
                     value={selectedLead.message || ''}
@@ -1096,6 +1160,56 @@ export default function Leads() {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setDetailOpen(false)}>Close</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Messages Dialog - show all messages for a lead */}
+      <Dialog open={messagesDialogOpen} onClose={() => setMessagesDialogOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>
+          <Box display="flex" alignItems="center" gap={1}>
+            <MessageIcon color="primary" />
+            <span>Messages</span>
+            {leadForMessages && (
+              <Typography variant="body2" color="text.secondary">
+                — {leadForMessages.name} ({leadForMessages.email})
+              </Typography>
+            )}
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          {leadForMessages && (
+            <List dense>
+              {leadForMessages.messages && leadForMessages.messages.length > 0 ? (
+                leadForMessages.messages.map((m, i) => (
+                  <ListItem key={i} alignItems="flex-start" sx={{ flexDirection: 'column', alignItems: 'stretch', borderBottom: i < leadForMessages.messages.length - 1 ? 1 : 0, borderColor: 'divider', pb: 2, mb: 2 }}>
+                    <Box display="flex" justifyContent="space-between" alignItems="center" mb={0.5}>
+                      <Chip label={m.topic || 'Message'} size="small" variant="outlined" />
+                      <Typography variant="caption" color="text.secondary">
+                        {m.createdAt ? new Date(m.createdAt).toLocaleString() : ''}
+                      </Typography>
+                    </Box>
+                    <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                      {m.text}
+                    </Typography>
+                  </ListItem>
+                ))
+              ) : (
+                <ListItem>
+                  <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                    {leadForMessages.message || 'No message'}
+                  </Typography>
+                  {leadForMessages.createdAt && (
+                    <Typography variant="caption" color="text.secondary" display="block" mt={1}>
+                      {new Date(leadForMessages.createdAt).toLocaleString()}
+                    </Typography>
+                  )}
+                </ListItem>
+              )}
+            </List>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setMessagesDialogOpen(false)}>Close</Button>
         </DialogActions>
       </Dialog>
 
