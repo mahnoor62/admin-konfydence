@@ -29,6 +29,8 @@ import {
   Tabs,
   Tab,
   Stack,
+  Switch,
+  FormControlLabel,
 } from '@mui/material';
 import {
   ArrowBack,
@@ -108,6 +110,7 @@ export default function LeadDetail() {
   });
   const [convertOpen, setConvertOpen] = useState(false);
   const [convertLoading, setConvertLoading] = useState(false);
+  const [demoApprovalLoading, setDemoApprovalLoading] = useState(false);
   const [convertForm, setConvertForm] = useState({
     name: '',
     type: '',
@@ -216,6 +219,30 @@ export default function LeadDetail() {
     } catch (err) {
       console.error('Error updating demo status:', err);
       setActionError(err.response?.data?.error || 'Failed to update demo status');
+    }
+  };
+
+  // Demo leads: topic is demo-schools/demo-businesses or demoStatus is requested
+  const isDemoLead = lead && (
+    ['demo-schools', 'demo-businesses'].includes(lead.topic) ||
+    lead.demoStatus === 'requested' ||
+    (lead.demoRequested === true && (lead.topic || '').toLowerCase().includes('demo'))
+  );
+
+  const handleDemoApprovalChange = async (event) => {
+    const checked = event.target.checked;
+    try {
+      setDemoApprovalLoading(true);
+      setActionError(null);
+      await api.put(`/leads/unified/${id}/demo-approval`, { demoApproved: checked });
+      setSuccessMessage(checked ? 'Demo approved and email sent to lead.' : 'Demo not approved and rejection email sent to lead.');
+      fetchLeadDetail();
+      setTimeout(() => setSuccessMessage(null), 5000);
+    } catch (err) {
+      console.error('Error updating demo approval:', err);
+      setActionError(err.response?.data?.error || 'Failed to update demo approval');
+    } finally {
+      setDemoApprovalLoading(false);
     }
   };
 
@@ -672,6 +699,27 @@ export default function LeadDetail() {
                       />
                     </Box>
                   </Box>
+                  {isDemoLead && (
+                    <Box>
+                      <Typography variant="caption" color="text.secondary">
+                        Approve Demo
+                      </Typography>
+                      <Box display="flex" alignItems="center" gap={1} mt={1}>
+                        <FormControlLabel
+                          control={
+                            <Switch
+                              checked={!!lead.demoApproved}
+                              onChange={handleDemoApprovalChange}
+                              disabled={demoApprovalLoading}
+                              color="primary"
+                            />
+                          }
+                          label={lead.demoApproved ? 'Approved' : 'Not approved'}
+                        />
+                        {demoApprovalLoading && <CircularProgress size={20} />}
+                      </Box>
+                    </Box>
+                  )}
                   <Box>
                     <Typography variant="caption" color="text.secondary">
                       Quote Status
